@@ -1,34 +1,47 @@
 #!/usr/bin/python3.7
 from ftplib import FTP
-import argparse
+import requests
+import sys
 
 
-DOMAIN_NAME = 'ireknazm.space'
+NAMENODE_ADDR = 'ireknazm.space'
 
 
-def connect():
-    ftp = FTP(DOMAIN_NAME)
+def connect(addr):
+    ftp = FTP(addr)
     ftp.connect('localhost', 1026)
     ftp.login()
     ftp.cwd('directory_name')       # replace with your directory
     ftp.retrlines('LIST')
 
 
-def uploadFile(ftp, filename):
+def upload_file(ftp, filename):
     ftp.storbinary('STOR '+filename, open(filename, 'rb'))
     ftp.quit()
 
 
-def downloadFile(ftp, filename):
+def download_file(ftp, filename):
     localfile = open(filename, 'wb')
     ftp.retrbinary('RETR ' + filename, localfile.write, 1024)
     ftp.quit()
     localfile.close()
 
 
+def start_http_server():
+    pass
+
+
+def login(name, psw):
+    r = requests.get('http://127.0.0.1/login', data=f'{name},{psw}')
+    print(r.text)
+
+
 def main():
-    print("HELLO!")
+    pass
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    args = sys.argv[1:]
+    if args[0] == 'login':
+        login(args[1], args[2])
