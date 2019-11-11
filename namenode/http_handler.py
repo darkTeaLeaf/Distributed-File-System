@@ -16,12 +16,39 @@ class Handler(BaseHTTPRequestHandler):
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
         args = json.loads(post_data)
+        
         self._set_response()
+        msg = {'msg': 'success'}
 
         if self.path == '/init':
-            self.ftp_client.initialize(args)
+            self.ftp_client.initialize()
+        elif self.path == '/create':
+            self.ftp_client.create_file(args)
+        elif self.path == '/create':
+            pass
+        elif self.path == '/rm':
+            pass
+        elif self.path == '/info':
+            pass
+        elif self.path == '/cd':
+            pass
+        elif self.path == '/ls':
+            pass
+        elif self.path == '/rmdir':
+            pass
+        elif self.path == '/read':
+            pass
+        elif self.path == '/write':
+            pass
+        elif self.path == '/copy':
+            pass
+        elif self.path == '/move':
+            pass
+        else:
+            print("Error! Command doesn't exist.")
+            msg['msg'] = 'failure'
 
-        self.wfile.write(json.dumps(args).encode('utf-8'))  # send message back to the sender
+        self.wfile.write(json.dumps(msg).encode('utf-8'))  # send message back to the sender
 
 
 def test_server():
