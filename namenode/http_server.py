@@ -18,6 +18,9 @@ class Handler(BaseHTTPRequestHandler):
         response_msg = ""
         if self.path == '/init':
             response_msg = str(self.ftp_client.initialize())
+        if self.path == '/create':
+            response_msg = str(self.ftp_client.create_file(**args))
+
         self.wfile.write(response_msg.encode("utf-8"))  # send message back to the sender
 
 

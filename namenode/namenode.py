@@ -10,7 +10,7 @@ class Namenode:
         self.port = port
         self.num_replicas = num_replicas
         self.fs_tree = Directory(None, '/')
-        self.curdir = '/'
+        self.work_dir = self.fs_tree
 
         self.ftp_client = FTPClient(self, num_replicas, **auth_data)
         Handler.ftp_client = self.ftp_client

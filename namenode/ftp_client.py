@@ -1,3 +1,4 @@
+import os
 from ftplib import FTP
 
 from .fs_tree import Directory, File
@@ -9,19 +10,48 @@ class FTPClient:
         self.namenode = namenode
         self.datanodes = set()
 
-        self.ftp = FTP()
         self.auth_data = auth_data
 
     def initialize(self):
         disk_sizes = []
         for datanode in self.datanodes:
-            self.ftp.connect(datanode, 21)
-            self.ftp.login(**self.auth_data)
-            self.ftp.voidcmd("SITE RMDCONT /")
-            available_size = self.ftp.sendcmd("AVBL /").split(' ')[1]
-            disk_sizes.append(available_size)
-            self.ftp.quit()
+            with FTP(datanode, **self.auth_data) as ftp:
+                ftp.voidcmd("SITE RMDCONT /")
+                available_size = ftp.sendcmd("AVBL /").split(' ')[1]
+                disk_sizes.append(available_size)
 
-            self.namenode.fs_tree = Directory(None, '/')
-            self.namenode.curdir = '/'
+            self.namenode.fs_tree = Directory('/')
+            self.namenode.work_dir = self.namenode.fs_tree
         return sum(disk_sizes)
+
+    def create_file(self, file_path):
+        parent_dir, abs_path = self.namenode.work_dir.get_absolute_path(file_path)
+        if parent_dir is None:
+            return abs_path
+
+        file_name = abs_path.split('/')[-1]
+        if file_name in parent_dir:
+            return 'File already exists'
+
+        try:
+            file = parent_dir.add_file(file_name)
+            file.write_counter += 1
+
+            selected_datanodes = []
+            for datanode in self.datanodes:
+                if len(selected_datanodes) > self.num_replicas:
+                    continue
+
+                with FTP(datanode, **self.auth_data) as ftp:
+                    ftp.voidcmd(f"SITE CRF {abs_path}")
+                    selected_datanodes.append(datanode)
+            file.nodes = selected_datanodes
+        except Exception as e:
+            parent_dir.pop(file_name)
+            return 'File was not created due to internal error'
+        finally:
+            file.write_counter -= 1
+        return ''
+
+
+
