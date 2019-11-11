@@ -44,19 +44,39 @@ class Directory:
             elif path.startswith('./'):
                 path = path[2:]
             elif isinstance(cur_dir, File):
-                return None, "No such file or directory"
+                return None, "No such file or directory."
             else:
                 parent_dir, path = path.split('/', 1)
                 if parent_dir in cur_dir:
                     cur_dir = cur_dir[parent_dir]
                 else:
-                    return None, "No such file or directory"
+                    return None, "No such file or directory."
         return cur_dir, os.path.join(str(cur_dir), self.name)
 
     def add_file(self, file_name):
         new_file = File(self, file_name)
         self.children[file_name] = new_file
         return new_file
+
+    def set_read_lock(self):
+        if self.parent is not None:
+            self.parent.set_read_lock()
+        self.read_counter += 1
+
+    def release_read_lock(self):
+        if self.parent is not None:
+            self.parent.release_read_lock()
+        self.read_counter -= 1
+
+    def set_write_lock(self):
+        if self.parent is not None:
+            self.parent.set_write_lock()
+        self.write_counter += 1
+
+    def release_write_lock(self):
+        if self.parent is not None:
+            self.parent.release_write_lock()
+        self.write_counter -= 1
 
 
 class File:
@@ -75,3 +95,19 @@ class File:
 
     def writable(self):
         return self.write_counter == 0 and self.read_counter == 0
+
+    def set_read_lock(self):
+        self.parent.set_read_lock()
+        self.read_counter += 1
+
+    def release_read_lock(self):
+        self.parent.release_read_lock()
+        self.read_counter -= 1
+
+    def set_write_lock(self):
+        self.parent.set_write_lock()
+        self.write_counter += 1
+
+    def release_write_lock(self):
+        self.parent.release_write_lock()
+        self.write_counter -= 1
