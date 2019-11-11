@@ -1,34 +1,27 @@
-from ftplib import FTP
-
+from .ftp_client import FTPClient
+from .http_server import Handler
+from http.server import HTTPServer
 from .fs_tree import Directory, File
 
 
 class Namenode:
-    def __init__(self, num_replicas, **auth_data):
+    def __init__(self, address, port, num_replicas, **auth_data):
+        self.address = address
+        self.port = port
         self.num_replicas = num_replicas
         self.fs_tree = Directory(None, '/')
-        self.datanodes = set()
         self.curdir = '/'
 
-        self.ftp = FTP()
-        self.auth_data = auth_data
+        self.ftp_client = FTPClient(self, num_replicas, **auth_data)
+        Handler.ftp_client = self.ftp_client
+        self.http_server = HTTPServer((address, port), Handler)
 
-    def listener(self, command, args):
-        if command == 'init':
-            responce = self.initialize()
-
-        return responce
-
-    def initialize(self):
-        disk_sizes = []
-        for datanode in self.datanodes:
-            self.ftp.connect(datanode, 21)
-            self.ftp.login(**self.auth_data)
-            self.ftp.voidcmd("SITE RMDCONT /")
-            available_size = self.ftp.sendcmd("AVBL /").split(' ')[1]
-            disk_sizes.append(available_size)
-            self.ftp.quit()
-
-            self.fs_tree = Directory(None, '/')
-            self.curdir = '/'
-        return sum(disk_sizes)
+    def start(self):
+        print("Starting server on port:", self.port)
+        try:
+            print("Server is available on:", self.address)
+            self.http_server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        self.http_server.server_close()
+        print("Server is closed")

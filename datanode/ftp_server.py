@@ -58,8 +58,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     authorizer = DummyAuthorizer()
-    authorizer.add_user("Namenode", "1234576890", "", perm="elradfmwMT")
-    authorizer.add_user("User", "Ireksan", "", perm="elr")
+    authorizer.add_user("Namenode", "1234576890", homedir="", perm="elradfmwMT")
+    authorizer.add_anonymous(homedir="", perm="elr")
+    # authorizer.add_user("User", "Ireksan", "", perm="elr")
 
     handler = CustomizedFTPHandler
     handler.authorizer = authorizer

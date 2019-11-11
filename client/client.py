@@ -31,8 +31,8 @@ def start_http_server():
     pass
 
 
-def login(name, psw):
-    r = requests.get('http://127.0.0.1/login', data=f'{name},{psw}')
+def login(*args):
+    r = requests.get('http://127.0.0.1/login', data=' '.join(list(map(str, args))))
     print(r.text)
 
 
