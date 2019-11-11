@@ -1,6 +1,7 @@
 import argparse
 import os
 import shutil
+import subprocess
 from os.path import join, isdir, isfile
 
 from pyftpdlib.authorizers import DummyAuthorizer
@@ -12,9 +13,13 @@ proto_cmds.update(
     {'SITE RMTREE': dict(perm='d', auth=True, arg=True,
                          help='Syntax: SITE <SP> RMTREE <SP> path (remove directory tree).'),
      'SITE RMDCONT': dict(perm='d', auth=True, arg=True,
-                          help='Syntax: SITE <SP> RMDCONT  (remove all nested content in the directory tree).'),
+                          help='Syntax: SITE <SP> RMDCONT (remove all nested content in the directory tree).'),
      'AVBL': dict(perm='l', auth=True, arg=True,
                   help='Syntax: AVBL (return size of total used and free disk space).'),
+     'SITE EXEC': dict(perm='M', auth=True, arg=True,
+                       help='Syntax: SITE <SP> EXEC line (execute given command on server).'),
+     'CRF': dict(perm='a', auth=True, arg=True,
+                 help='Syntax: CRF path (create empty file).')
      }
 )
 
@@ -48,6 +53,27 @@ class CustomizedFTPHandler(FTPHandler):
             return total, used, free
         else:
             self.respond("550 Given path is not a directory")
+
+    def ftp_SITE_EXEC(self, line):
+        process = subprocess.run(line, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+
+        if process.returncode != 0:
+            error = process.stderr.decode("utf-8")
+            self.respond(f"500 {error}")
+            return error
+        else:
+            self.respond("250 Given command was executed successfully")
+            return process.stdout.decode("utf-8")
+
+    def ftp_CRF(self, path):
+        process = subprocess.run(f'touch {path}', stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+
+        if process.returncode != 0:
+            error = process.stderr.decode("utf-8")
+            self.respond(f"500 {error}")
+            return error
+        else:
+            self.respond("250 Empty file was created successfully")
 
 
 if __name__ == '__main__':
