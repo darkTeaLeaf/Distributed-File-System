@@ -1,5 +1,5 @@
 from .ftp_client import FTPClient
-from .http_server import Handler
+from .http_handler import Handler
 from http.server import HTTPServer
 from .fs_tree import Directory, File
 
