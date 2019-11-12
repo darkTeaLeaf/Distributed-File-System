@@ -23,9 +23,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/init':
             self.ftp_client.initialize()
         elif self.path == '/create':
-            self.ftp_client.create_file(args)
-        elif self.path == '/create':
-            pass
+            self.ftp_client.create_file(**args)
+        elif self.path == '/update_lock':
+            self.ftp_client.namenode.update_lock(**args)
+        elif self.path == '/release_lock':
+            self.ftp_client.namenode.release_lock(**args)
         elif self.path == '/rm':
             pass
         elif self.path == '/info':

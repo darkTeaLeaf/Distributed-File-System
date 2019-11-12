@@ -15,6 +15,9 @@ class Directory:
     def __contains__(self, item):
         return item in self.children
 
+    def __hash__(self):
+        return hash(str(self))
+
     def readable(self):
         return self.write_counter == 0
 

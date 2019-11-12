@@ -1,4 +1,5 @@
 import os
+import time
 from ftplib import FTP
 
 from .fs_tree import Directory, File
@@ -53,7 +54,7 @@ class FTPClient:
             file.release_write_lock()
         return ''
 
-    def read_file(self, file_path):
+    def read_file(self, file_path, client_ip):
         parent_dir, abs_path = self.namenode.work_dir.get_absolute_path(file_path)
         if parent_dir is None:
             return abs_path
@@ -67,7 +68,9 @@ class FTPClient:
             return 'File is being written. Reading cannot be performed.'
 
         file.set_read_lock()
+        self.namenode.client_locks[client_ip][file] = (time.time(), 0)
         return ' '.join(file.nodes)
+
 
 
 
