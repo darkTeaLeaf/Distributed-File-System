@@ -69,14 +69,8 @@ class CustomizedFTPHandler(FTPHandler):
             return process.stdout.decode("utf-8")
 
     def ftp_CRF(self, path):
-        process = subprocess.run(f'touch {path}', stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-
-        if process.returncode != 0:
-            error = process.stderr.decode("utf-8")
-            self.respond(f"500 {error}")
-            return error
-        else:
-            self.respond("250 Empty file was created successfully")
+        open(path, 'wb').close()
+        self.respond("250 Empty file was created successfully")
 
 
 def connect_to_namenode(namenode_ip, homedir):

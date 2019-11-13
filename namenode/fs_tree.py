@@ -1,5 +1,4 @@
 import os
-import json
 
 
 class Directory:
@@ -13,7 +12,6 @@ class Directory:
         self.write_counter = 0
 
     def __str__(self):
-        print(str(self.parent), self.name)
         if self.parent is None:
             return self.name
         else:

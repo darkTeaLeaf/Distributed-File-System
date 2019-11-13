@@ -37,9 +37,9 @@ class FTPClient:
     def create_file(self, file_path):
         parent_dir, abs_path = self.namenode.work_dir.get_absolute_path(file_path)
         if parent_dir is None:
-            return abs_path
+            return 'Cannot create a file'
 
-        file_name = abs_path.split('/')[-1]
+        file_name = file_path.split('/')[-1]
         if file_name in parent_dir:
             return 'File already exists.'
 
@@ -50,15 +50,13 @@ class FTPClient:
             selected_datanodes = set()
             for datanode in self.datanodes:
                 if len(selected_datanodes) > self.num_replicas:
-                    continue
-
+                    break
                 try:
                     with FTP(datanode, **self.auth_data) as ftp:
-                        ftp.voidcmd(f"CRF {abs_path}")
+                        ftp.voidcmd(f"CRF {os.path.join(abs_path, file_name)}")
                         selected_datanodes.add(datanode)
                 except ConnectionRefusedError:
                     continue
-
             file.nodes = selected_datanodes
         except Exception as e:
             parent_dir.delete_file(file_name)
