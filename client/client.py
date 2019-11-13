@@ -1,23 +1,15 @@
 #!/usr/bin/python3.7
-from ftplib import FTP
+from ftplib import FTP, all_errors
 import requests
 import sys
+import subprocess
+import re
+import socket
+from threading import Timer, Thread
 
 
 NAMENODE_ADDR = 'ireknazm.space'
-
-
-def connect(addr):
-    ftp = FTP(addr)
-    ftp.connect('localhost', 21)
-    ftp.login()
-    ftp.cwd('directory_name')       # replace with your directory
-    ftp.retrlines('LIST')
-
-
-def upload_file(ftp, filename):
-    ftp.storbinary('STOR '+filename, open(filename, 'rb'))
-    ftp.quit()
+CLIENT_IP = ''
 
 
 def download_file(ftp, filename):
@@ -49,6 +41,42 @@ def send_req(cmd, args):
         print(r.json())
     except Exception as e:
         print(e)
+
+
+def ping_datanodes(datanodes):
+    latency = []
+    for datanode in datanodes:
+        ping = subprocess.Popen(["ping", datanode, "-n", "1"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                shell=True)
+        output = ping.communicate()
+
+        pattern = r"Average = (\d+\S+)"
+        latency.append(int(re.findall(pattern, output[0].decode())[0][:-2]))
+
+    return latency
+
+
+def read_file(filename, datanodes, **auth_data):
+    latency = ping_datanodes(datanodes)
+    data_stored = False
+
+    for latency, datanode in sorted(zip(latency, datanodes)):
+        try:
+            ftp = FTP(datanode, **auth_data)
+            ftp.storbinary('STOR ' + filename, open(filename, 'rb'))
+            ftp.quit()
+            data_stored = True
+            break
+        except all_errors:
+            continue
+
+    if not data_stored:
+        print('Cannot connect to datanode')
+
+
+def update_lock():
+    Timer(300.0, update_lock).start()
+    send_req('update_lock', {'client_ip': CLIENT_IP})
 
 
 def main():
@@ -84,6 +112,8 @@ def main():
             send_req('login', {'username': args[1], 'password': args[2]})
         elif args[0] == 'read':
             send_req('read', {'path_from': args[1], 'path_to': args[2]})
+
+
         elif args[0] == 'write':
             send_req('write', {'path_from': args[1], 'path_to': args[2]})
         elif args[0] == 'copy':
@@ -97,4 +127,5 @@ def main():
 
 
 if __name__ == "__main__":
+    CLIENT_IP = socket.gethostbyname(socket.gethostname())
     main()
