@@ -6,27 +6,28 @@ class Directory:
     def __init__(self, name, parent=None):
         self.parent = parent
         self.name = name
-        self.children = {}
+        self.children_files = {}
+        self.children_directories = {}
+
         self.read_counter = 0
         self.write_counter = 0
 
     def __str__(self):
-        return os.path.join(str(self.parent), self.name)
+        print(str(self.parent), self.name)
+        if self.parent is None:
+            return self.name
+        else:
+            return os.path.join(str(self.parent), self.name)
 
     def __contains__(self, item):
-        return item in self.children
+        return item in self.children_files or item in self.children_directories
 
     def __hash__(self):
         return hash(str(self))
 
     def to_dict(self):
-        files = []
-        dirs = {}
-        for name, obj in self.children.items():
-            if isinstance(obj, Directory):
-                dirs[name] = obj.to_dict()
-            else:
-                files.append(name)
+        files = [name for name, obj in self.children_files.items()]
+        dirs = {name: obj.to_dict() for name, obj in self.children_directories.items()}
         return {'f': files, 'd': dirs}
 
     def readable(self):
@@ -36,7 +37,7 @@ class Directory:
         return self.write_counter == 0 and self.read_counter == 0
 
     def empty(self):
-        return len(self.children) == 0
+        return len(self.children_directories) == 0 and len(self.children_files) == 0
 
     def get_root(self):
         if self.name == '/':
@@ -58,7 +59,7 @@ class Directory:
             elif path.startswith('./'):
                 path = path[2:]
             elif isinstance(cur_dir, File):
-                return None, "No such file or directory."
+                return None, "No such directory."
             else:
                 parent_dir, path = path.split('/', 1)
                 if parent_dir in cur_dir:
@@ -69,12 +70,15 @@ class Directory:
 
     def add_file(self, file_name):
         new_file = File(file_name, self)
-        self.children[file_name] = new_file
+        self.children_files[file_name] = new_file
         return new_file
+
+    def delete_file(self, file_name):
+        return self.children_files.pop(file_name)
 
     def add_directory(self, dir_name):
         new_dir = Directory(dir_name, self)
-        self.children[dir_name] = new_dir
+        self.children_directories[dir_name] = new_dir
         return new_dir
 
     def set_read_lock(self):
@@ -108,6 +112,9 @@ class File:
 
     def __str__(self):
         return os.path.join(str(self.parent), self.name)
+
+    def __hash__(self):
+        return hash(str(self))
 
     def readable(self):
         return self.write_counter == 0

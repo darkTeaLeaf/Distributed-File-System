@@ -30,7 +30,7 @@ class Namenode:
         self.address = address
         self.port = port
         self.num_replicas = num_replicas
-        self.fs_tree = Directory(None, '/')
+        self.fs_tree = Directory('/')
         self.work_dir = self.fs_tree
         self.client_locks = defaultdict(dict)
         self.lock_duration = lock_duration
@@ -56,6 +56,8 @@ class Namenode:
         return self.fs_tree.to_dict()
 
     def add_datanode(self, datanode_ip):
+        if datanode_ip == '127.0.0.1':
+            datanode_ip = 'localhost'
         self.ftp_client.datanodes.add(datanode_ip)
         return ''
 

@@ -10,6 +10,7 @@ from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
 
+
 proto_cmds = FTPHandler.proto_cmds.copy()
 proto_cmds.update(
     {'SITE RMTREE': dict(perm='d', auth=True, arg=True,
@@ -79,10 +80,10 @@ class CustomizedFTPHandler(FTPHandler):
 
 
 def connect_to_namenode(namenode_ip, homedir):
+    cur_dir = os.getcwd()
     try:
         r = requests.get(f'http://{namenode_ip}:80/synchronize', json='')
         fs_tree = r.json()['msg']
-        cur_dir = os.getcwd()
         os.chdir(homedir)
         for path, dirs, files in os.walk(os.path.curdir):
             cur_tree = fs_tree
@@ -103,10 +104,11 @@ def connect_to_namenode(namenode_ip, homedir):
                 if local_file not in cur_tree['f']:
                     os.remove(join(path, local_file))
 
-        os.chdir(cur_dir)
         requests.get(f'http://{namenode_ip}:80/add_node', json='')
     except Exception as e:
         print(e)
+    finally:
+        os.chdir(cur_dir)
 
 
 if __name__ == '__main__':
