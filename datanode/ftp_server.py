@@ -119,7 +119,7 @@ if __name__ == '__main__':
     connect_to_namenode(args.namenode_ip, args.homedir)
     authorizer = DummyAuthorizer()
     authorizer.add_user("Namenode", "1234576890", homedir=args.homedir, perm="elradfmwMT")
-    authorizer.add_anonymous(homedir=args.homedir, perm="elr")
+    authorizer.add_anonymous(homedir=args.homedir, perm="elrw")
 
     handler = CustomizedFTPHandler
     handler.authorizer = authorizer

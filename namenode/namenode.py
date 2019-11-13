@@ -66,15 +66,15 @@ class Namenode:
 
     def update_lock(self, client_ip, file_path):
         parent_dir, abs_path = self.work_dir.get_absolute_path(file_path)
-        file_name = abs_path.split('/')[-1]
-        file = parent_dir[file_name]
+        file_name = file_path.split('/')[-1]
+        file = parent_dir.children_files[file_name]
         lock_start, is_write = self.client_locks[client_ip][file]
         self.client_locks[client_ip][file] = (time.time(), is_write)
 
     def release_lock(self, client_ip, file_path):
         parent_dir, abs_path = self.work_dir.get_absolute_path(file_path)
-        file_name = abs_path.split('/')[-1]
-        file = parent_dir[file_name]
+        file_name = file_path.split('/')[-1]
+        file = parent_dir.children_files[file_name]
         lock_start, is_write = self.client_locks[client_ip].pop(file)
         if is_write:
             file.release_write_lock()

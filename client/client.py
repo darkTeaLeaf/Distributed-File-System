@@ -1,12 +1,10 @@
 #!/usr/bin/python3.7
-from ftplib import FTP, all_errors
-import requests
 import sys
-import subprocess
-import re
-import time
+from ftplib import FTP, all_errors
 from threading import Thread, Event
 
+import requests
+from tcp_latency import measure_latency
 
 NAMENODE_ADDR = 'ireknazm.space'
 
@@ -29,7 +27,8 @@ def print_help():
 
 def send_req(cmd, args=''):
     try:
-        r = requests.get('http://127.0.0.1:80/'+cmd, json=args)
+        r = requests.get('http://127.0.0.1:80/' + cmd, json=args)
+        print(r.json()['msg'])
         return r.json()['msg']
     except Exception as e:
         print(e)
@@ -38,23 +37,19 @@ def send_req(cmd, args=''):
 def ping_datanodes(datanodes):
     latency = []
     for datanode in datanodes:
-        ping = subprocess.Popen(["ping", datanode, "-n", "1"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                shell=True)
-        output = ping.communicate()
-
-        pattern = r"Average = (\d+\S+)"
-        latency.append(int(re.findall(pattern, output[0].decode())[0][:-2]))
-
+        latency.append(measure_latency(host=datanode, port=21)[0])
     return latency
 
 
 def update_lock(event, file_from):
     while not event.wait(300):
-        send_req('update_lock', {'path_from': file_from})
+        send_req('update_lock', {'file_path': file_from})
 
 
-def read_file(file_from, file_to, **auth_data):
-    datanodes = send_req('read', {'path_from': file_from})
+def read_file(file_from, file_to):
+    result = send_req('read', {'file_path': file_from})
+    datanodes = result['ips']
+    file_from = result['path']
 
     event = Event()
     send_clock_update = Thread(target=update_lock, args=(event, file_from))
@@ -62,10 +57,10 @@ def read_file(file_from, file_to, **auth_data):
 
     latency = ping_datanodes(datanodes)
     data_stored = False
-
     for latency, datanode in sorted(zip(latency, datanodes)):
         try:
-            with FTP(datanode, **auth_data) as ftp, open(file_to, 'wb') as localfile:
+            with FTP(datanode) as ftp, open(file_to, 'wb') as localfile:
+                ftp.login()
                 ftp.retrbinary('RETR ' + file_from, localfile.write, 1024)
                 data_stored = True
                 break
@@ -78,11 +73,11 @@ def read_file(file_from, file_to, **auth_data):
     event.set()
     send_clock_update.join()
 
-    send_req('release_lock', {'path_from': file_from})
+    send_req('release_lock', {'file_path': file_from})
 
 
 def write_file(file_from, file_to, **auth_data):
-    datanodes = send_req('write', {'path_to': file_to})
+    datanodes = send_req('write', {'file_path': file_to})
 
     event = Event()
     send_clock_update = Thread(target=update_lock, args=(event, file_to))
@@ -94,6 +89,7 @@ def write_file(file_from, file_to, **auth_data):
     for latency, datanode in sorted(zip(latencies, datanodes)):
         try:
             with FTP(datanode, **auth_data) as ftp, open(file_from, 'rb') as localfile:
+                ftp.login()
                 ftp.storbinary('STOR ' + file_to, localfile)
                 data_stored = True
                 break
@@ -111,17 +107,17 @@ def write_file(file_from, file_to, **auth_data):
 
 
 def main():
-    args = sys.argv[1:]     # get command with arguments
+    args = sys.argv[1:]  # get command with arguments
     if len(args) == 0:
         print("Empty command!\nFor help write command: help")
-    elif len(args) == 1:            # commands without any argument
+    elif len(args) == 1:  # commands without any argument
         if args[0] == 'help':
             print_help()
         elif args[0] == 'init':
             send_req('init')
         else:
             print("Incorrect command!\nFor help write command: help")
-    elif len(args) == 2:            # commands with 1 argument
+    elif len(args) == 2:  # commands with 1 argument
         if args[0] == 'create':
             send_req('create', {'file_path': args[1]})
         elif args[0] == 'rm':
@@ -138,7 +134,7 @@ def main():
             send_req('rmdir', {'path': args[1]})
         else:
             print("Incorrect command!\nFor help write command: help")
-    elif len(args) == 3:            # commands with 2 arguments
+    elif len(args) == 3:  # commands with 2 arguments
         if args[0] == 'login':
             send_req('login', {'username': args[1], 'password': args[2]})
         elif args[0] == 'read':

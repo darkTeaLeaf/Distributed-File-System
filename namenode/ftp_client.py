@@ -82,13 +82,14 @@ class FTPClient:
         if file_name not in parent_dir:
             return 'File does not exist.'
 
-        file = parent_dir[file_name]
+        file = parent_dir.children_files[file_name]
         if not file.readable():
             return 'File is being written. Reading cannot be performed.'
 
         file.set_read_lock()
         self.namenode.client_locks[client_ip][file] = (time.time(), 0)
         return {'ips': list(file.nodes), 'path': abs_path}
+        # return list(file.nodes)
 
     def remove_file(self, file_path):
         parent_dir, abs_path, file_name = self.get_file(file_path)
