@@ -43,7 +43,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == '/mkdir':
             msg['msg'] = self.ftp_client.create_directory(**args)
         elif self.path == '/cd':
-            pass
+            msg['msg'] = self.ftp_client.open_directory(**args)
         elif self.path == '/ls':
             pass
         elif self.path == '/rmdir':
