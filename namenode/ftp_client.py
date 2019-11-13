@@ -87,25 +87,21 @@ class FTPClient:
         if parent_dir is None:
             return abs_path
 
-        file_name = abs_path.split('/')[-1]
+        file_name = file_path.split('/')[-1]
         if file_name not in parent_dir:
             return 'File does not exist.'
 
-        file = parent_dir[file_name]
+        file = parent_dir.children_files[file_name]
         if not file.writable():
             return 'File is blocked by another process. Deleting cannot be performed.'
 
-        file.parent.pop(file_name)
+        parent_dir.delete_file(file_name)
 
         for datanode in self.datanodes:
             try:
                 with FTP(datanode, **self.auth_data) as ftp:
-                    ftp.voidcmd(f"DELE {abs_path}")
+                    ftp.voidcmd(f"DELE {file}")
             except ConnectionRefusedError:
                 continue
 
         return 'File was deteled'
-
-
-
-
