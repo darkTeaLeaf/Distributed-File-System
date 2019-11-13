@@ -1,11 +1,12 @@
 #!/usr/bin/python3.7
 from http.server import BaseHTTPRequestHandler
 from http.server import HTTPServer
+from .ftp_client import FTPClient
 import json
 
 
 class Handler(BaseHTTPRequestHandler):
-    ftp_client = None
+    ftp_client: FTPClient = None
 
     def _set_response(self):
         self.send_response(200)
@@ -14,22 +15,30 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         content_length = int(self.headers['Content-Length'])
+
         post_data = self.rfile.read(content_length)
         args = json.loads(post_data)
-        
+
         self._set_response()
         msg = {'msg': 'success'}
 
-        if self.path == '/init':
-            self.ftp_client.initialize()
+        if self.path == '/synchronize':
+            print(self.client_address)
+            msg['msg'] = self.ftp_client.namenode.traverse_fs_tree()
+        elif self.path == '/add_node':
+            msg['msg'] = self.ftp_client.namenode.add_datanode(self.client_address)
+        elif self.path == '/init':
+            msg['msg'] = self.ftp_client.initialize()
         elif self.path == '/create':
-            self.ftp_client.create_file(**args)
+            msg['msg'] = self.ftp_client.create_file(**args)
+        elif self.path == '/read':
+            msg['msg'] = self.ftp_client.read_file(client_ip=self.client_address[0], **args)
         elif self.path == '/update_lock':
-            self.ftp_client.namenode.update_lock(**args)
+            msg['msg'] = self.ftp_client.namenode.update_lock(client_ip=self.client_address[0], **args)
         elif self.path == '/release_lock':
-            self.ftp_client.namenode.release_lock(**args)
+            msg['msg'] = self.ftp_client.namenode.release_lock(client_ip=self.client_address[0], **args)
         elif self.path == '/rm':
-            pass
+            msg['msg'] = self.ftp_client.remove_file(**args)
         elif self.path == '/info':
             pass
         elif self.path == '/cd':
@@ -37,8 +46,6 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == '/ls':
             pass
         elif self.path == '/rmdir':
-            pass
-        elif self.path == '/read':
             pass
         elif self.path == '/write':
             pass

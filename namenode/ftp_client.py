@@ -2,7 +2,8 @@ import os
 import time
 from ftplib import FTP
 
-from .fs_tree import Directory, File
+from namenode.fs_tree import Directory, File
+# from namenode.namenode import Namenode
 
 
 class FTPClient:
@@ -16,10 +17,13 @@ class FTPClient:
     def initialize(self):
         disk_sizes = []
         for datanode in self.datanodes:
-            with FTP(datanode, **self.auth_data) as ftp:
-                ftp.voidcmd("SITE RMDCONT /")
-                available_size = ftp.sendcmd("AVBL /").split(' ')[1]
-                disk_sizes.append(available_size)
+            try:
+                with FTP(datanode, **self.auth_data) as ftp:
+                    ftp.voidcmd("SITE RMDCONT /")
+                    available_size = ftp.sendcmd("AVBL /").split(' ')[1]
+                    disk_sizes.append(available_size)
+            except ConnectionRefusedError:
+                continue
 
             self.namenode.fs_tree = Directory('/')
             self.namenode.work_dir = self.namenode.fs_tree
@@ -38,14 +42,18 @@ class FTPClient:
             file = parent_dir.add_file(file_name)
             file.set_write_lock()
 
-            selected_datanodes = []
+            selected_datanodes = set()
             for datanode in self.datanodes:
                 if len(selected_datanodes) > self.num_replicas:
                     continue
 
-                with FTP(datanode, **self.auth_data) as ftp:
-                    ftp.voidcmd(f"CRF {abs_path}")
-                    selected_datanodes.append(datanode)
+                try:
+                    with FTP(datanode, **self.auth_data) as ftp:
+                        ftp.voidcmd(f"CRF {abs_path}")
+                        selected_datanodes.add(datanode)
+                except ConnectionRefusedError:
+                    continue
+
             file.nodes = selected_datanodes
         except Exception as e:
             parent_dir.pop(file_name)
@@ -70,6 +78,30 @@ class FTPClient:
         file.set_read_lock()
         self.namenode.client_locks[client_ip][file] = (time.time(), 0)
         return ' '.join(file.nodes)
+
+    def remove_file(self, file_path):
+        parent_dir, abs_path = self.namenode.work_dir.get_absolute_path(file_path)
+        if parent_dir is None:
+            return abs_path
+
+        file_name = abs_path.split('/')[-1]
+        if file_name not in parent_dir:
+            return 'File does not exist.'
+
+        file = parent_dir[file_name]
+        if not file.writable():
+            return 'File is blocked by another process. Deleting cannot be performed.'
+
+        file.parent.pop(file_name)
+
+        for datanode in self.datanodes:
+            try:
+                with FTP(datanode, **self.auth_data) as ftp:
+                    ftp.voidcmd(f"DELE {abs_path}")
+            except ConnectionRefusedError:
+                continue
+
+        return 'File was deteled'
 
 
 

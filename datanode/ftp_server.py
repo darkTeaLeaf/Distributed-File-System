@@ -2,8 +2,10 @@ import argparse
 import os
 import shutil
 import subprocess
-from os.path import join, isdir, isfile
+from os.path import join, isdir, isfile, exists
+import sys
 
+import requests
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
@@ -76,17 +78,51 @@ class CustomizedFTPHandler(FTPHandler):
             self.respond("250 Empty file was created successfully")
 
 
+def connect_to_namenode(namenode_ip, homedir):
+    try:
+        r = requests.get(f'http://{namenode_ip}:80/synchronize', json='')
+        fs_tree = r.json()['msg']
+        cur_dir = os.getcwd()
+        os.chdir(homedir)
+        for path, dirs, files in os.walk(os.path.curdir):
+            cur_tree = fs_tree
+            components = path.split(os.sep)[1:]
+            for c in components:
+                cur_tree = cur_tree['d'][c]
+
+            for local_dir in dirs:
+                if local_dir not in cur_tree['d']:
+                    shutil.rmtree(join(path, local_dir))
+
+            for remote_dir in cur_tree['d']:
+                remote_dir = join(path, remote_dir)
+                if not exists(remote_dir):
+                    os.mkdir(remote_dir)
+
+            for local_file in files:
+                if local_file not in cur_tree['f']:
+                    os.remove(join(path, local_file))
+
+        os.chdir(cur_dir)
+    except Exception as e:
+        print(e)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--ip', type=str, required=True,
                         help='IP of the FTP server')
+    parser.add_argument('--homedir', type=str, required=True,
+                        help='Homedir of the FTP server')
+    parser.add_argument('--namenode_ip', type=str, required=True,
+                        help='Homedir of the FTP server')
     args = parser.parse_args()
 
+    connect_to_namenode(args.namenode_ip, args.homedir)
     authorizer = DummyAuthorizer()
-    authorizer.add_user("Namenode", "1234576890", homedir="", perm="elradfmwMT")
-    authorizer.add_anonymous(homedir="", perm="elr")
-    # authorizer.add_user("User", "Ireksan", "", perm="elr")
+    authorizer.add_user("Namenode", "1234576890", homedir=args.homedir, perm="elradfmwMT")
+    authorizer.add_anonymous(homedir=args.homedir, perm="elr")
 
     handler = CustomizedFTPHandler
     handler.authorizer = authorizer

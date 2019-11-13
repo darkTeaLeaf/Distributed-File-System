@@ -1,4 +1,5 @@
 import os
+import json
 
 
 class Directory:
@@ -17,6 +18,16 @@ class Directory:
 
     def __hash__(self):
         return hash(str(self))
+
+    def to_dict(self):
+        files = []
+        dirs = {}
+        for name, obj in self.children.items():
+            if isinstance(obj, Directory):
+                dirs[name] = obj.to_dict()
+            else:
+                files.append(name)
+        return {'f': files, 'd': dirs}
 
     def readable(self):
         return self.write_counter == 0
@@ -57,9 +68,14 @@ class Directory:
         return cur_dir, os.path.join(str(cur_dir), self.name)
 
     def add_file(self, file_name):
-        new_file = File(self, file_name)
+        new_file = File(file_name, self)
         self.children[file_name] = new_file
         return new_file
+
+    def add_directory(self, dir_name):
+        new_dir = Directory(dir_name, self)
+        self.children[dir_name] = new_dir
+        return new_dir
 
     def set_read_lock(self):
         if self.parent is not None:
@@ -83,10 +99,10 @@ class Directory:
 
 
 class File:
-    def __init__(self, parent, name):
+    def __init__(self, name, parent):
         self.parent = parent
         self.name = name
-        self.nodes = []
+        self.nodes = set()
         self.read_counter = 0
         self.write_counter = 0
 

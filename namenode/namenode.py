@@ -1,13 +1,27 @@
-from collections import defaultdict
-import os
 import time
+from collections import defaultdict
+from http.server import HTTPServer
 from multiprocessing import Process
 
+from namenode.fs_tree import Directory
+from namenode.ftp_client import FTPClient
+from namenode.http_handler import Handler
 
-from .ftp_client import FTPClient
-from .http_handler import Handler
-from http.server import HTTPServer
-from .fs_tree import Directory, File
+
+def check_locks(client_locks, update_time):
+    while True:
+        for user_ip, locked_files in client_locks.items():
+            for file in list(locked_files):
+                lock_start, is_write = locked_files[file]
+                if time.time() - lock_start > 300:
+                    if is_write:
+                        file.release_write_lock()
+                    else:
+                        file.release_read_lock()
+                    locked_files.pop(file)
+            if len(locked_files) == 0:
+                client_locks.pop(user_ip)
+        time.sleep(update_time)
 
 
 class Namenode:
@@ -17,6 +31,8 @@ class Namenode:
         self.port = port
         self.num_replicas = num_replicas
         self.fs_tree = Directory(None, '/')
+        self.fs_tree.add_file('ftp_client.py')
+        self.fs_tree.add_directory('dfgd')
         self.work_dir = self.fs_tree
         self.client_locks = defaultdict(dict)
         self.lock_duration = lock_duration
@@ -30,7 +46,7 @@ class Namenode:
         print("Starting server on port:", self.port)
         try:
             print("Server is available on:", self.address)
-            proc = Process(target=self.check_locks)
+            proc = Process(target=check_locks, args=(self.client_locks, self.update_time))
             proc.start()
             self.http_server.serve_forever()
         except KeyboardInterrupt:
@@ -38,20 +54,12 @@ class Namenode:
         self.http_server.server_close()
         print("Server is closed")
 
-    def check_locks(self):
-        while True:
-            for user_ip, locked_files in self.client_locks.items():
-                for file in list(locked_files):
-                    lock_start, is_write = locked_files[file]
-                    if time.time() - lock_start > 300:
-                        if is_write:
-                            file.release_write_lock()
-                        else:
-                            file.release_read_lock()
-                        locked_files.pop(file)
-                if len(locked_files) == 0:
-                    self.client_locks.pop(user_ip)
-            time.sleep(self.update_time)
+    def traverse_fs_tree(self):
+        return self.fs_tree.to_dict()
+
+    def add_datanode(self, datanode_ip):
+        self.ftp_client.datanodes.add(datanode_ip)
+        return ''
 
     def update_lock(self, client_ip, file_path):
         parent_dir, abs_path = self.work_dir.get_absolute_path(file_path)
@@ -73,3 +81,8 @@ class Namenode:
         if len(self.client_locks[client_ip]) == 0:
             self.client_locks.pop(client_ip)
 
+
+if __name__ == '__main__':
+    node = Namenode('127.0.0.1', 80, 2, lock_duration=300, update_time=200,
+                    username="Namenode", password="1234576890")
+    node.start()
