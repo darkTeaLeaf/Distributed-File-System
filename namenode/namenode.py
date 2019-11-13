@@ -1,7 +1,7 @@
 import time
 from collections import defaultdict
 from http.server import HTTPServer
-from threading import Timer
+from threading import Thread
 
 from namenode.fs_tree import Directory
 from namenode.ftp_client import FTPClient
@@ -22,6 +22,7 @@ def check_locks(update_time, client_locks, lock_duration):
             if len(locked_files) == 0:
                 client_locks.pop(user_ip)
         time.sleep(update_time)
+        print('Update')
 
 
 class Namenode:
@@ -44,8 +45,7 @@ class Namenode:
         print("Starting server on port:", self.port)
         try:
             print("Server is available on:", self.address)
-            check_locks(self.update_time, self.client_locks, self.lock_duration)
-            t = Timer(self.update_time, check_locks, args=(self.update_time, self.client_locks, self.lock_duration))
+            t = Thread(target=check_locks, args=(self.update_time, self.client_locks, self.lock_duration))
             t.start()
             self.http_server.serve_forever()
         except KeyboardInterrupt:
