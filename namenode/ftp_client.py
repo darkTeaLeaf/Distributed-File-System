@@ -3,7 +3,6 @@ import time
 from ftplib import FTP
 
 from namenode.fs_tree import Directory, File
-# from namenode.namenode import Namenode
 
 
 class FTPClient:

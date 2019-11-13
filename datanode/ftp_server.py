@@ -104,6 +104,7 @@ def connect_to_namenode(namenode_ip, homedir):
                     os.remove(join(path, local_file))
 
         os.chdir(cur_dir)
+        requests.get(f'http://{namenode_ip}:80/add_node', json='')
     except Exception as e:
         print(e)
 

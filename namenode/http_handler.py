@@ -23,10 +23,9 @@ class Handler(BaseHTTPRequestHandler):
         msg = {'msg': 'success'}
 
         if self.path == '/synchronize':
-            print(self.client_address)
             msg['msg'] = self.ftp_client.namenode.traverse_fs_tree()
         elif self.path == '/add_node':
-            msg['msg'] = self.ftp_client.namenode.add_datanode(self.client_address)
+            msg['msg'] = self.ftp_client.namenode.add_datanode(self.client_address[0])
         elif self.path == '/init':
             msg['msg'] = self.ftp_client.initialize()
         elif self.path == '/create':
@@ -58,17 +57,3 @@ class Handler(BaseHTTPRequestHandler):
             msg['msg'] = 'failure'
 
         self.wfile.write(json.dumps(msg).encode('utf-8'))  # send message back to the sender
-
-
-def test_server():
-    print("Starting server...")
-    http_server = HTTPServer(('127.0.0.1', 80), Handler)
-    try:
-        http_server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    http_server.server_close()
-    print("Server is closed")
-
-
-# test_server()

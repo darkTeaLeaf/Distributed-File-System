@@ -31,8 +31,6 @@ class Namenode:
         self.port = port
         self.num_replicas = num_replicas
         self.fs_tree = Directory(None, '/')
-        self.fs_tree.add_file('ftp_client.py')
-        self.fs_tree.add_directory('dfgd')
         self.work_dir = self.fs_tree
         self.client_locks = defaultdict(dict)
         self.lock_duration = lock_duration
@@ -85,4 +83,5 @@ class Namenode:
 if __name__ == '__main__':
     node = Namenode('127.0.0.1', 80, 2, lock_duration=300, update_time=200,
                     username="Namenode", password="1234576890")
+
     node.start()
