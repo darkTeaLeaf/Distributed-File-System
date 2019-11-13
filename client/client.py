@@ -4,12 +4,11 @@ import requests
 import sys
 import subprocess
 import re
-import socket
-from threading import Timer, Thread
+import time
+from threading import Thread, Event
 
 
 NAMENODE_ADDR = 'ireknazm.space'
-CLIENT_IP = ''
 
 
 def download_file(ftp, filename):
@@ -35,10 +34,10 @@ def print_help():
     rmdir  <folder name/path in FS>\n""")
 
 
-def send_req(cmd, args):
+def send_req(cmd, args=''):
     try:
         r = requests.get('http://127.0.0.1:80/'+cmd, json=args)
-        print(r.json()['msg'])
+        return r.json()['msg']
     except Exception as e:
         print(e)
 
@@ -56,7 +55,7 @@ def ping_datanodes(datanodes):
     return latency
 
 
-def read_file(filename, datanodes, **auth_data):
+def ftp_read(event, filename, datanodes, **auth_data):
     latency = ping_datanodes(datanodes)
     data_stored = False
 
@@ -73,10 +72,28 @@ def read_file(filename, datanodes, **auth_data):
     if not data_stored:
         print('Cannot connect to datanode')
 
+    event.set()
 
-def update_lock():
-    Timer(300.0, update_lock).start()
-    send_req('update_lock', {'client_ip': CLIENT_IP})
+
+def update_lock(event, file_from):
+    while not event.wait(300):
+        send_req('update_lock', {'path_from': file_from})
+
+
+def read_file(file_from, file_to, **auth_data):
+    datanodes = send_req('read', {'path_from': file_from})
+
+    event = Event()
+    read_file_ftp = Thread(target=ftp_read, args=(event, file_to, datanodes, auth_data))
+    send_clock_update = Thread(target=update_lock, args=(event, file_from))
+
+    read_file_ftp.start()
+    send_clock_update.start()
+
+    read_file_ftp.join()
+    send_clock_update.join()
+
+    send_req('release_lock', {'path_from': file_from})
 
 
 def main():
@@ -87,7 +104,7 @@ def main():
         if args[0] == 'help':
             print_help()
         elif args[0] == 'init':
-            send_req('init', {})
+            send_req('init')
         else:
             print("Incorrect command!\nFor help write command: help")
     elif len(args) == 2:            # commands with 1 argument
@@ -111,9 +128,7 @@ def main():
         if args[0] == 'login':
             send_req('login', {'username': args[1], 'password': args[2]})
         elif args[0] == 'read':
-            send_req('read', {'path_from': args[1], 'path_to': args[2]})
-
-
+            read_file(args[1], args[2])
         elif args[0] == 'write':
             send_req('write', {'path_from': args[1], 'path_to': args[2]})
         elif args[0] == 'copy':
@@ -127,5 +142,4 @@ def main():
 
 
 if __name__ == "__main__":
-    CLIENT_IP = socket.gethostbyname(socket.gethostname())
     main()
