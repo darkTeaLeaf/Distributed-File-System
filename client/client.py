@@ -108,6 +108,14 @@ def write_file(file_from, file_to, **auth_data):
     send_clock_update.join()
 
 
+def delete_directory(dir_path):
+    response = send_req('rmdir', {'dir_path': dir_path})
+
+    answer = input(response)
+    if answer == 'Y':
+        send_req('rmdir', {'dir_path': dir_path, 'force_delete': True})
+
+
 def main():
     args = sys.argv[1:]  # get command with arguments
     if len(args) == 0:
@@ -131,7 +139,7 @@ def main():
         elif args[0] == 'ls':
             send_req('ls', {'path': args[1]})
         elif args[0] == 'mkdir':
-            send_req('mkdir', {'dir_path': args[1]})
+            delete_directory(args[1])
         elif args[0] == 'rmdir':
             send_req('rmdir', {'dir_path': args[1]})
         else:

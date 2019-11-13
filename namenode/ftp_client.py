@@ -110,7 +110,7 @@ class FTPClient:
             except ConnectionRefusedError:
                 continue
 
-        return 'File was deteled'
+        return 'File was deleted'
 
     def get_info(self, file_path):
         parent_dir, abs_path, file_name = self.get_file(file_path)
@@ -182,3 +182,30 @@ class FTPClient:
         self.namenode.work_dir = parent_dir.children_directories[dir_name]
         self.namenode.work_dir.set_read_lock()
         return ''
+
+    def delete_directory(self, dir_path, force_delete=False):
+        parent_dir, abs_path, dir_name = self.get_file(dir_path)
+
+        if parent_dir is None:
+            return abs_path
+
+        if dir_name not in parent_dir:
+            return 'Directory does not exist.'
+
+        dir = parent_dir.children_directories[dir_name]
+        if (dir.children_directories or dir.children_files) and not force_delete:
+            return 'Directory is not empty. Are you sure to delete it anyway?[Y/n]'
+
+        if not dir.writable():
+            return 'Directory is blocked by another process. Deleting cannot be performed.'
+
+        parent_dir.delete_directory(dir_name)
+
+        for datanode in self.datanodes:
+            try:
+                with FTP(datanode, **self.auth_data) as ftp:
+                    ftp.voidcmd(f"SITE RMTREE {abs_path}")
+            except ConnectionRefusedError:
+                continue
+
+        return 'Directory was deleted'
