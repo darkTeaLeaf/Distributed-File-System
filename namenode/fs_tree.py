@@ -41,7 +41,7 @@ class Directory:
         if self.name == '/':
             return self
         else:
-            return self.parent.get_root(self)
+            return self.parent.get_root()
 
     def get_absolute_path(self, path):
         sw = lambda x, s: x.startswith(s)

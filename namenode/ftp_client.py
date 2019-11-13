@@ -44,6 +44,18 @@ class FTPClient:
         abs_path = os.path.join(str(parent_dir), file_name)
         return parent_dir, abs_path, file_name
 
+    def get_dir(self, file_path):
+        parent_dir, abs_path = self.namenode.work_dir.get_absolute_path(file_path)
+        if parent_dir is None:
+            return None, 'Incorrect path', None
+
+        if str(parent_dir) == abs_path:
+            return parent_dir, str(parent_dir), str(parent_dir)
+        else:
+            file_name = file_path.split('/')[-1]
+            abs_path = os.path.join(str(parent_dir), file_name)
+            return parent_dir, abs_path, file_name
+
     def create_file(self, file_path):
         parent_dir, abs_path, file_name = self.get_file(file_path)
         if parent_dir is None:
@@ -87,7 +99,43 @@ class FTPClient:
 
         self.namenode.set_client_lock(client_ip, file, 0)
         return {'ips': list(file.nodes), 'path': abs_path}
-        # return list(file.nodes)
+
+    def write_file(self, file_path, client_ip, file_size):
+        parent_dir, abs_path, file_name = self.get_file(file_path)
+        if parent_dir is None:
+            return abs_path
+
+        old_file_size = 0
+        if file_name in parent_dir:
+            file = parent_dir.children_files[file_name]
+            if not file.writable():
+                return 'File is blocked by another process. Writing cannot be performed.'
+            for datanode in file.nodes:
+                try:
+                    with FTP(datanode, **self.auth_data) as ftp:
+                        ftp.voidcmd('TYPE I')
+                        old_file_size = ftp.size(str(file))
+                        break
+                except ConnectionRefusedError:
+                    continue
+
+        else:
+            file = parent_dir.add_file(file_name)
+        self.namenode.set_client_lock(client_ip, file, 1)
+
+        selected_datanodes = set()
+        for datanode in self.datanodes:
+            try:
+                with FTP(datanode, **self.auth_data) as ftp:
+                    if ftp.sendcmd("AVBL /").split(' ')[3] - old_file_size > file_size:
+                        selected_datanodes.add(datanode)
+            except ConnectionRefusedError:
+                continue
+        file.nodes = selected_datanodes
+        if len(selected_datanodes) == 0:
+            self.namenode.release_lock(client_ip, abs_path)
+
+        return {'ips': list(file.nodes), 'path': abs_path}
 
     def remove_file(self, file_path):
         parent_dir, abs_path, file_name = self.get_file(file_path)
@@ -149,12 +197,12 @@ class FTPClient:
         return result
 
     def create_directory(self, dir_path):
-        parent_dir, abs_path, dir_name = self.get_file(dir_path)
+        parent_dir, abs_path, dir_name = self.get_dir(dir_path)
 
         if parent_dir is None:
             return abs_path
 
-        if dir_name in parent_dir:
+        if dir_name in parent_dir or abs_path == str(parent_dir):
             return 'Directory already exist.'
 
         try:
@@ -178,9 +226,14 @@ class FTPClient:
         parent_dir, abs_path, dir_name = self.get_file(dir_path)
         if parent_dir is None:
             return abs_path
+
         self.namenode.work_dir.release_read_lock()
-        self.namenode.work_dir = parent_dir.children_directories[dir_name]
+        if str(parent_dir) != abs_path:
+            self.namenode.work_dir = parent_dir.children_directories[dir_name]
+        else:
+            self.namenode.work_dir = parent_dir
         self.namenode.work_dir.set_read_lock()
+
         return ''
 
     def delete_directory(self, dir_path, force_delete=False):
@@ -188,16 +241,18 @@ class FTPClient:
 
         if parent_dir is None:
             return abs_path
+        if abs_path == str(parent_dir):
+            return 'You cannot delete root directory.'
 
         if dir_name not in parent_dir:
             return 'Directory does not exist.'
 
         dir = parent_dir.children_directories[dir_name]
-        if (dir.children_directories or dir.children_files) and not force_delete:
-            return 'Directory is not empty. Are you sure to delete it anyway?[Y/n]'
-
         if not dir.writable():
             return 'Directory is blocked by another process. Deleting cannot be performed.'
+
+        if (dir.children_directories or dir.children_files) and not force_delete:
+            return 'Directory is not empty. Are you sure to delete it anyway?[Y/n]'
 
         parent_dir.delete_directory(dir_name)
 
