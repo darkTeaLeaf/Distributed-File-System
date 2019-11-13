@@ -11,13 +11,6 @@ from threading import Thread, Event
 NAMENODE_ADDR = 'ireknazm.space'
 
 
-def download_file(ftp, filename):
-    localfile = open(filename, 'wb')
-    ftp.retrbinary('RETR ' + filename, localfile.write, 1024)
-    ftp.quit()
-    localfile.close()
-
-
 def print_help():
     print("""\nList of available commands:
     init
@@ -55,26 +48,6 @@ def ping_datanodes(datanodes):
     return latency
 
 
-def ftp_read(event, filename, datanodes, **auth_data):
-    latency = ping_datanodes(datanodes)
-    data_stored = False
-
-    for latency, datanode in sorted(zip(latency, datanodes)):
-        try:
-            ftp = FTP(datanode, **auth_data)
-            ftp.storbinary('STOR ' + filename, open(filename, 'rb'))
-            ftp.quit()
-            data_stored = True
-            break
-        except all_errors:
-            continue
-
-    if not data_stored:
-        print('Cannot connect to datanode')
-
-    event.set()
-
-
 def update_lock(event, file_from):
     while not event.wait(300):
         send_req('update_lock', {'path_from': file_from})
@@ -84,16 +57,57 @@ def read_file(file_from, file_to, **auth_data):
     datanodes = send_req('read', {'path_from': file_from})
 
     event = Event()
-    read_file_ftp = Thread(target=ftp_read, args=(event, file_to, datanodes, auth_data))
     send_clock_update = Thread(target=update_lock, args=(event, file_from))
-
-    read_file_ftp.start()
     send_clock_update.start()
 
-    read_file_ftp.join()
+    latency = ping_datanodes(datanodes)
+    data_stored = False
+
+    for latency, datanode in sorted(zip(latency, datanodes)):
+        try:
+            with FTP(datanode, **auth_data) as ftp, open(file_to, 'wb') as localfile:
+                ftp.retrbinary('RETR ' + file_from, localfile.write, 1024)
+                data_stored = True
+                break
+        except all_errors:
+            continue
+
+    if not data_stored:
+        print('Cannot connect to datanode')
+
+    event.set()
     send_clock_update.join()
 
     send_req('release_lock', {'path_from': file_from})
+
+
+def write_file(file_from, file_to, **auth_data):
+    datanodes = send_req('write', {'path_to': file_to})
+
+    event = Event()
+    send_clock_update = Thread(target=update_lock, args=(event, file_to))
+    send_clock_update.start()
+
+    latencies = ping_datanodes(datanodes)
+    data_stored = False
+
+    for latency, datanode in sorted(zip(latencies, datanodes)):
+        try:
+            with FTP(datanode, **auth_data) as ftp, open(file_from, 'rb') as localfile:
+                ftp.storbinary('STOR ' + file_to, localfile)
+                data_stored = True
+                break
+        except all_errors:
+            continue
+
+    if not data_stored:
+        print('Cannot connect to datanode')
+
+    event.set()
+
+    send_clock_update.join()
+
+    send_req('release_lock', {'path_to': file_to})
 
 
 def main():
@@ -130,7 +144,7 @@ def main():
         elif args[0] == 'read':
             read_file(args[1], args[2])
         elif args[0] == 'write':
-            send_req('write', {'path_from': args[1], 'path_to': args[2]})
+            write_file(args[1], args[2])
         elif args[0] == 'copy':
             send_req('copy', {'path_from': args[1], 'path_to': args[2]})
         elif args[0] == 'move':
