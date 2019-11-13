@@ -45,7 +45,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == '/cd':
             msg['msg'] = self.ftp_client.open_directory(**args)
         elif self.path == '/ls':
-            pass
+            msg['msg'] = self.ftp_client.read_directory(**args)
         elif self.path == '/rmdir':
             msg['msg'] = self.ftp_client.delete_directory(**args)
         elif self.path == '/write':

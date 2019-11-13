@@ -109,11 +109,14 @@ def write_file(file_from, file_to, **auth_data):
 
 
 def delete_directory(dir_path):
-    response = send_req('rmdir', {'dir_path': dir_path})
+    response, flag = send_req('rmdir', {'dir_path': dir_path})
 
-    answer = input(response)
-    if answer == 'Y':
-        send_req('rmdir', {'dir_path': dir_path, 'force_delete': True})
+    if flag:
+        answer = input(response)
+        if answer == 'Y':
+            send_req('rmdir', {'dir_path': dir_path, 'force_delete': True})
+    else:
+        print(response)
 
 
 def main():
@@ -125,6 +128,8 @@ def main():
             print_help()
         elif args[0] == 'init':
             send_req('init')
+        elif args[0] == 'ls':
+            send_req('ls')
         else:
             print("Incorrect command!\nFor help write command: help")
     elif len(args) == 2:  # commands with 1 argument
@@ -137,11 +142,11 @@ def main():
         elif args[0] == 'cd':
             send_req('cd', {'dir_path': args[1]})
         elif args[0] == 'ls':
-            send_req('ls', {'path': args[1]})
+            send_req('ls', {'dir_path': args[1]})
         elif args[0] == 'mkdir':
-            delete_directory(args[1])
+            send_req('mkdir', {'dir_path': args[1]})
         elif args[0] == 'rmdir':
-            send_req('rmdir', {'dir_path': args[1]})
+            delete_directory(args[1])
         else:
             print("Incorrect command!\nFor help write command: help")
     elif len(args) == 3:  # commands with 2 arguments

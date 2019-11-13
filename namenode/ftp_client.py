@@ -242,17 +242,17 @@ class FTPClient:
         if parent_dir is None:
             return abs_path
         if abs_path == str(parent_dir):
-            return 'You cannot delete root directory.'
+            return 'You cannot delete root directory.', 0
 
         if dir_name not in parent_dir:
-            return 'Directory does not exist.'
+            return 'Directory does not exist.', 0
 
         dir = parent_dir.children_directories[dir_name]
         if not dir.writable():
-            return 'Directory is blocked by another process. Deleting cannot be performed.'
+            return 'Directory is blocked by another process. Deleting cannot be performed.', 0
 
         if (dir.children_directories or dir.children_files) and not force_delete:
-            return 'Directory is not empty. Are you sure to delete it anyway?[Y/n]'
+            return 'Directory is not empty. Are you sure to delete it anyway?[Y/n]', 1
 
         parent_dir.delete_directory(dir_name)
 
@@ -263,4 +263,22 @@ class FTPClient:
             except ConnectionRefusedError:
                 continue
 
-        return 'Directory was deleted'
+        return 'Directory was deleted', 0
+
+    def read_directory(self, dir_path=None):
+        if dir_path is None:
+            parent_dir, abs_path, dir_name = self.get_dir(str(self.namenode.work_dir))
+        else:
+            parent_dir, abs_path, dir_name = self.get_dir(dir_path)
+
+        if parent_dir is None:
+            return abs_path
+
+        if dir_name not in parent_dir:
+            return 'Directory does not exist.'
+
+        dir = parent_dir.children_directories[dir_name]
+        files = [name for name, obj in dir.children_files.items()]
+        dirs = [name for name, obj in dir.children_directories.items()]
+
+        return {'files': files, 'dirs': dirs}
