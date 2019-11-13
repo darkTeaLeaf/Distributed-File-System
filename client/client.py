@@ -2,7 +2,7 @@
 import sys
 from ftplib import FTP, all_errors
 from threading import Thread, Event
-
+import os
 import requests
 from tcp_latency import measure_latency
 
@@ -77,7 +77,9 @@ def read_file(file_from, file_to):
 
 
 def write_file(file_from, file_to, **auth_data):
-    datanodes = send_req('write', {'file_path': file_to})
+    result = send_req('write', {'file_path': file_to, 'file_size': os.path.getsize(file_from)})
+    datanodes = result['ips']
+    file_from = result['path']
 
     event = Event()
     send_clock_update = Thread(target=update_lock, args=(event, file_to))
@@ -129,9 +131,9 @@ def main():
         elif args[0] == 'ls':
             send_req('ls', {'path': args[1]})
         elif args[0] == 'mkdir':
-            send_req('mkdir', {'path': args[1]})
+            send_req('mkdir', {'dir_path': args[1]})
         elif args[0] == 'rmdir':
-            send_req('rmdir', {'path': args[1]})
+            send_req('rmdir', {'dir_path': args[1]})
         else:
             print("Incorrect command!\nFor help write command: help")
     elif len(args) == 3:  # commands with 2 arguments

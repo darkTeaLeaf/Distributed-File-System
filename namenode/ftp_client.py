@@ -149,3 +149,30 @@ class FTPClient:
             except ConnectionRefusedError:
                 continue
         return result
+
+    def create_directory(self, dir_path):
+        parent_dir, abs_path, dir_name = self.get_file(dir_path)
+
+        if parent_dir is None:
+            return abs_path
+
+        if dir_name in parent_dir:
+            return 'Directory already exist.'
+
+        try:
+            dir = parent_dir.add_directory(dir_name)
+            dir.set_write_lock()
+
+            for datanode in self.datanodes:
+                try:
+                    with FTP(datanode, **self.auth_data) as ftp:
+                        ftp.voidcmd(f"MKD {abs_path}")
+                except ConnectionRefusedError:
+                    continue
+        except Exception as e:
+            parent_dir.delete_directory(dir_name)
+            return 'Directory was not created due to internal error.'
+        finally:
+            dir.release_write_lock()
+        return ''
+
