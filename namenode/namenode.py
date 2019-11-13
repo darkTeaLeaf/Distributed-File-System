@@ -1,19 +1,19 @@
 import time
 from collections import defaultdict
 from http.server import HTTPServer
-from multiprocessing import Process
+from threading import Thread
 
 from namenode.fs_tree import Directory
 from namenode.ftp_client import FTPClient
 from namenode.http_handler import Handler
 
 
-def check_locks(client_locks, update_time):
+def check_locks(update_time, client_locks, lock_duration):
     while True:
         for user_ip, locked_files in client_locks.items():
             for file in list(locked_files):
                 lock_start, is_write = locked_files[file]
-                if time.time() - lock_start > 300:
+                if time.time() - lock_start > lock_duration:
                     if is_write:
                         file.release_write_lock()
                     else:
@@ -22,6 +22,7 @@ def check_locks(client_locks, update_time):
             if len(locked_files) == 0:
                 client_locks.pop(user_ip)
         time.sleep(update_time)
+        print('Update')
 
 
 class Namenode:
@@ -44,11 +45,13 @@ class Namenode:
         print("Starting server on port:", self.port)
         try:
             print("Server is available on:", self.address)
-            proc = Process(target=check_locks, args=(self.client_locks, self.update_time))
-            proc.start()
+            t = Thread(target=check_locks, args=(self.update_time, self.client_locks, self.lock_duration))
+            t.start()
             self.http_server.serve_forever()
         except KeyboardInterrupt:
             pass
+        finally:
+            t.cancel()
         self.http_server.server_close()
         print("Server is closed")
 

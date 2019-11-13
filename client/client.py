@@ -111,9 +111,9 @@ def main():
         if args[0] == 'create':
             send_req('create', {'file_path': args[1]})
         elif args[0] == 'rm':
-            send_req('rm', {'path': args[1]})
+            send_req('rm', {'file_path': args[1]})
         elif args[0] == 'info':
-            send_req('info', {'path': args[1]})
+            send_req('info', {'file_path': args[1]})
         elif args[0] == 'cd':
             send_req('cd', {'path': args[1]})
         elif args[0] == 'ls':
