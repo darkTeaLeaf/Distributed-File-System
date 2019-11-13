@@ -40,6 +40,8 @@ class Handler(BaseHTTPRequestHandler):
             msg['msg'] = self.ftp_client.remove_file(**args)
         elif self.path == '/info':
             msg['msg'] = self.ftp_client.get_info(**args)
+        elif self.path == '/mkdir':
+            msg['msg'] = self.ftp_client.create_directory(**args)
         elif self.path == '/cd':
             pass
         elif self.path == '/ls':
