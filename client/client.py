@@ -38,7 +38,7 @@ def print_help():
 def send_req(cmd, args):
     try:
         r = requests.get('http://127.0.0.1:80/'+cmd, json=args)
-        print(r.json())
+        print(r.json()['msg'])
     except Exception as e:
         print(e)
 

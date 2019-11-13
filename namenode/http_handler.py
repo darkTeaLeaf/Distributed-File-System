@@ -39,7 +39,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == '/rm':
             msg['msg'] = self.ftp_client.remove_file(**args)
         elif self.path == '/info':
-            pass
+            msg['msg'] = self.ftp_client.get_info(**args)
         elif self.path == '/cd':
             pass
         elif self.path == '/ls':
