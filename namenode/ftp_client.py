@@ -174,3 +174,27 @@ class FTPClient:
             dir.release_write_lock()
         return ''
 
+    def open_directory(self, dir_path):
+        parent_dir, abs_path, dir_name = self.get_file(dir_path)
+
+        if parent_dir is None:
+            return abs_path
+
+        try:
+            dir = parent_dir.children_directories[dir_name]
+            prev_work_dir = self.namenode.work_dir
+            self.namenode.work_dir = dir
+            dir.set_write_lock()
+
+            for datanode in self.datanodes:
+                try:
+                    with FTP(datanode, **self.auth_data) as ftp:
+                        ftp.voidcmd(f"CWD {abs_path}")
+                except ConnectionRefusedError:
+                    continue
+        except Exception as e:
+            self.namenode.work_dir = prev_work_dir
+            return 'Working directory was not changed due to internal error.'
+        finally:
+            dir.release_write_lock()
+        return ''
