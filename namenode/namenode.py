@@ -64,6 +64,14 @@ class Namenode:
         self.ftp_client.datanodes.add(datanode_ip)
         return ''
 
+    def set_client_lock(self, client_ip, file, is_write=False):
+        if is_write:
+            file.set_write_lock()
+        else:
+            file.set_read_lock()
+
+        self.client_locks[client_ip][file] = (time.time(), is_write)
+
     def update_lock(self, client_ip, file_path):
         parent_dir, abs_path = self.work_dir.get_absolute_path(file_path)
         file_name = file_path.split('/')[-1]

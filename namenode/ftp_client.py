@@ -52,10 +52,9 @@ class FTPClient:
         if file_name in parent_dir:
             return 'File already exists.'
 
+        file = parent_dir.add_file(file_name)
+        file.set_write_lock()
         try:
-            file = parent_dir.add_file(file_name)
-            file.set_write_lock()
-
             selected_datanodes = set()
             for datanode in self.datanodes:
                 if len(selected_datanodes) > self.num_replicas:
@@ -67,11 +66,11 @@ class FTPClient:
                 except ConnectionRefusedError:
                     continue
             file.nodes = selected_datanodes
+            file.release_write_lock()
         except Exception as e:
+            file.release_write_lock()
             parent_dir.delete_file(file_name)
             return 'File was not created due to internal error.'
-        finally:
-            file.release_write_lock()
         return ''
 
     def read_file(self, file_path, client_ip):
@@ -86,8 +85,7 @@ class FTPClient:
         if not file.readable():
             return 'File is being written. Reading cannot be performed.'
 
-        file.set_read_lock()
-        self.namenode.client_locks[client_ip][file] = (time.time(), 0)
+        self.namenode.set_client_lock(client_ip, file, 0)
         return {'ips': list(file.nodes), 'path': abs_path}
         # return list(file.nodes)
 
