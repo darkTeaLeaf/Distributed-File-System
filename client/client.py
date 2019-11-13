@@ -37,7 +37,7 @@ def print_help():
 
 def send_req(cmd, args):
     try:
-        r = requests.get('http://127.0.0.1/'+cmd, json=args)
+        r = requests.get('http://127.0.0.1:80/'+cmd, json=args)
         print(r.json())
     except Exception as e:
         print(e)
@@ -92,7 +92,7 @@ def main():
             print("Incorrect command!\nFor help write command: help")
     elif len(args) == 2:            # commands with 1 argument
         if args[0] == 'create':
-            send_req('create', {'path': args[1]})
+            send_req('create', {'file_path': args[1]})
         elif args[0] == 'rm':
             send_req('rm', {'path': args[1]})
         elif args[0] == 'info':
