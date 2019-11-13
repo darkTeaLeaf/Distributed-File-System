@@ -41,7 +41,7 @@ class FTPClient:
             return None, 'Incorrect path', None
 
         file_name = file_path.split('/')[-1]
-        abs_path = os.path.join(abs_path, file_name)
+        abs_path = os.path.join(str(parent_dir), file_name)
         return parent_dir, abs_path, file_name
 
     def create_file(self, file_path):
@@ -176,25 +176,9 @@ class FTPClient:
 
     def open_directory(self, dir_path):
         parent_dir, abs_path, dir_name = self.get_file(dir_path)
-
         if parent_dir is None:
             return abs_path
-
-        try:
-            dir = parent_dir.children_directories[dir_name]
-            prev_work_dir = self.namenode.work_dir
-            self.namenode.work_dir = dir
-            dir.set_write_lock()
-
-            for datanode in self.datanodes:
-                try:
-                    with FTP(datanode, **self.auth_data) as ftp:
-                        ftp.voidcmd(f"CWD {abs_path}")
-                except ConnectionRefusedError:
-                    continue
-        except Exception as e:
-            self.namenode.work_dir = prev_work_dir
-            return 'Working directory was not changed due to internal error.'
-        finally:
-            dir.release_write_lock()
+        self.namenode.work_dir.release_read_lock()
+        self.namenode.work_dir = parent_dir.children_directories[dir_name]
+        self.namenode.work_dir.set_read_lock()
         return ''

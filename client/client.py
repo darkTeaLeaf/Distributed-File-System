@@ -100,12 +100,12 @@ def write_file(file_from, file_to, **auth_data):
 
     if not data_stored:
         print('Cannot connect to datanode')
+        send_req('release_lock', {'path_to': file_to})
+    else:
+        send_req('replicate_file', {'path_to': file_to})
 
     event.set()
-
     send_clock_update.join()
-
-    send_req('release_lock', {'path_to': file_to})
 
 
 def main():
@@ -127,7 +127,7 @@ def main():
         elif args[0] == 'info':
             send_req('info', {'file_path': args[1]})
         elif args[0] == 'cd':
-            send_req('cd', {'path': args[1]})
+            send_req('cd', {'dir_path': args[1]})
         elif args[0] == 'ls':
             send_req('ls', {'path': args[1]})
         elif args[0] == 'mkdir':

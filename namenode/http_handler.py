@@ -50,6 +50,8 @@ class Handler(BaseHTTPRequestHandler):
             pass
         elif self.path == '/write':
             pass
+        elif self.path == '/replicate_file':
+            pass
         elif self.path == '/copy':
             pass
         elif self.path == '/move':

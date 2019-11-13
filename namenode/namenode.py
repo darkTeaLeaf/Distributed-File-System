@@ -32,6 +32,7 @@ class Namenode:
         self.port = port
         self.num_replicas = num_replicas
         self.fs_tree = Directory('/')
+        self.fs_tree.set_read_lock()
         self.work_dir = self.fs_tree
         self.client_locks = defaultdict(dict)
         self.lock_duration = lock_duration
