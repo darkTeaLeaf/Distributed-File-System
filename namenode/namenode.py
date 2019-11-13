@@ -9,18 +9,19 @@ from namenode.http_handler import Handler
 
 
 def check_locks(update_time, client_locks, lock_duration):
-    for user_ip, locked_files in client_locks.items():
-        for file in list(locked_files):
-            lock_start, is_write = locked_files[file]
-            if time.time() - lock_start > lock_duration:
-                if is_write:
-                    file.release_write_lock()
-                else:
-                    file.release_read_lock()
-                locked_files.pop(file)
-        if len(locked_files) == 0:
-            client_locks.pop(user_ip)
-    Timer(update_time, check_locks, args=(update_time, client_locks, lock_duration)).start()
+    while True:
+        for user_ip, locked_files in client_locks.items():
+            for file in list(locked_files):
+                lock_start, is_write = locked_files[file]
+                if time.time() - lock_start > lock_duration:
+                    if is_write:
+                        file.release_write_lock()
+                    else:
+                        file.release_read_lock()
+                    locked_files.pop(file)
+            if len(locked_files) == 0:
+                client_locks.pop(user_ip)
+        time.sleep(update_time)
 
 
 class Namenode:
@@ -44,9 +45,13 @@ class Namenode:
         try:
             print("Server is available on:", self.address)
             check_locks(self.update_time, self.client_locks, self.lock_duration)
+            t = Timer(self.update_time, check_locks, args=(self.update_time, self.client_locks, self.lock_duration))
+            t.start()
             self.http_server.serve_forever()
         except KeyboardInterrupt:
             pass
+        finally:
+            t.cancel()
         self.http_server.server_close()
         print("Server is closed")
 
