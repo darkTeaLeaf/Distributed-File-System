@@ -129,7 +129,7 @@ def main():
         elif args[0] == 'init':
             send_req('init')
         elif args[0] == 'ls':
-            send_req('ls')
+            send_req('ls', {})
         else:
             print("Incorrect command!\nFor help write command: help")
     elif len(args) == 2:  # commands with 1 argument

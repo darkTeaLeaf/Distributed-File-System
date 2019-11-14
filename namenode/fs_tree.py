@@ -64,7 +64,7 @@ class Directory:
                     cur_dir = cur_dir[parent_dir]
                 else:
                     return None, "No such file or directory."
-        return cur_dir, os.path.join(str(cur_dir), self.name)
+        return cur_dir, os.path.join(str(cur_dir), path.split('/')[-1])
 
     def add_file(self, file_name):
         new_file = File(file_name, self)

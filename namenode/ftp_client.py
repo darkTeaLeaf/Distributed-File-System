@@ -223,7 +223,7 @@ class FTPClient:
         return ''
 
     def open_directory(self, dir_path):
-        parent_dir, abs_path, dir_name = self.get_file(dir_path)
+        parent_dir, abs_path, dir_name = self.get_dir(dir_path)
         if parent_dir is None:
             return abs_path
 
@@ -274,10 +274,12 @@ class FTPClient:
         if parent_dir is None:
             return abs_path
 
-        if dir_name not in parent_dir:
-            return 'Directory does not exist.'
-
-        dir = parent_dir.children_directories[dir_name]
+        if str(parent_dir) != abs_path:
+            if dir_name not in parent_dir:
+                return 'Directory does not exist.'
+            dir = parent_dir.children_directories[dir_name]
+        else:
+            dir = parent_dir
         files = [name for name, obj in dir.children_files.items()]
         dirs = [name for name, obj in dir.children_directories.items()]
 
