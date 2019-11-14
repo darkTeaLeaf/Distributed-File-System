@@ -76,7 +76,7 @@ def read_file(file_from, file_to):
     send_req('release_lock', {'file_path': file_from})
 
 
-def write_file(file_from, file_to, **auth_data):
+def write_file(file_from, file_to):
     result = send_req('write', {'file_path': file_to, 'file_size': os.path.getsize(file_from)})
     datanodes = result['ips']
     file_from = result['path']
@@ -90,7 +90,7 @@ def write_file(file_from, file_to, **auth_data):
 
     for latency, datanode in sorted(zip(latencies, datanodes)):
         try:
-            with FTP(datanode, **auth_data) as ftp, open(file_from, 'rb') as localfile:
+            with FTP(datanode) as ftp, open(file_from, 'rb') as localfile:
                 ftp.login()
                 ftp.storbinary('STOR ' + file_to, localfile)
                 data_stored = True

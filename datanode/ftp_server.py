@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 from os.path import join, isdir, isfile, exists
-import sys
+from ftplib import FTP, all_errors
 
 import requests
 from pyftpdlib.authorizers import DummyAuthorizer
@@ -23,7 +23,9 @@ proto_cmds.update(
      'CRF': dict(perm='a', auth=True, arg=True,
                  help='Syntax: CRF path (create empty file).'),
      'MV': dict(perm='M', auth=True, arg=True,
-                help='Syntax: MV path_from path_to (move file from path_from to path_to).')
+                help='Syntax: MV path_from path_to (move file from path_from to path_to).'),
+     'REPL': dict(perm='w', auth=True, arg=True,
+                    help='Syntax: REPL ip_datanode path_from path_to (make replica on ip_datanode).')
      }
 )
 
@@ -76,6 +78,18 @@ class CustomizedFTPHandler(FTPHandler):
     def ftp_MV(self, path_from, path_to):
         shutil.move(path_from, path_to)
         self.respond("250 File was moved successfully")
+
+    def ftp_REPL(self, ip_datanode, path_from, path_to):
+        try:
+            with FTP(ip_datanode) as ftp, open(path_from, 'rb') as localfile:
+                ftp.login()
+                ftp.storbinary('STOR ' + path_to, localfile)
+        except all_errors:
+            self.respond(f"500 Replica was not created on {ip_datanode} due to connection error")
+            return False
+
+        self.respond(f"250 Replica was created on {ip_datanode}")
+        return True
 
 
 def connect_to_namenode(namenode_ip, homedir):
