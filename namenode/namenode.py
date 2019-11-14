@@ -65,7 +65,7 @@ class Namenode:
         self.ftp_client.datanodes.add(datanode_ip)
         return ''
 
-    def set_client_lock(self, client_ip, file, is_write=False):
+    def set_lock(self, client_ip, file, is_write=False):
         if is_write:
             file.set_write_lock()
         else:

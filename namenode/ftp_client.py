@@ -1,9 +1,8 @@
 import os
-import time
-from ftplib import FTP
 from datetime import datetime
+from ftplib import FTP
 
-from namenode.fs_tree import Directory, File
+from namenode.fs_tree import Directory
 
 
 class FTPClient:
@@ -97,7 +96,7 @@ class FTPClient:
         if not file.readable():
             return 'File is being written. Reading cannot be performed.'
 
-        self.namenode.set_client_lock(client_ip, file, 0)
+        self.namenode.set_lock(client_ip, file, 0)
         return {'ips': list(file.nodes), 'path': abs_path}
 
     def write_file(self, file_path, client_ip, file_size):
@@ -105,37 +104,45 @@ class FTPClient:
         if parent_dir is None:
             return abs_path
 
-        old_file_size = 0
         if file_name in parent_dir:
             file = parent_dir.children_files[file_name]
             if not file.writable():
                 return 'File is blocked by another process. Writing cannot be performed.'
-            for datanode in file.nodes:
-                try:
-                    with FTP(datanode, **self.auth_data) as ftp:
-                        ftp.voidcmd('TYPE I')
-                        old_file_size = ftp.size(str(file))
-                        break
-                except ConnectionRefusedError:
-                    continue
-
         else:
             file = parent_dir.add_file(file_name)
-        self.namenode.set_client_lock(client_ip, file, 1)
+        self.namenode.set_lock(client_ip, file, 1)
 
-        selected_datanodes = set()
-        for datanode in self.datanodes:
+        selected_nodes = self._select_datanodes_for_write(file, file_size)
+        if len(selected_nodes) == 0:
+            self.namenode.release_lock(client_ip, abs_path)
+            return 'There is no available nodes to store file'
+        else:
+            # self._delete_file_from_nodes(file)
+            file.new_nodes = selected_nodes
+            return {'ips': list(selected_nodes), 'path': abs_path}
+
+    def replicate_file(self, file_name, node_ip):
+        pass
+
+    def _select_datanodes_for_write(self, file, file_size):
+        selected_nodes = set()
+        for node in self.datanodes:
             try:
-                with FTP(datanode, **self.auth_data) as ftp:
+                with FTP(node, **self.auth_data) as ftp:
+                    old_file_size = file.size if node in file.nodes else 0
                     if ftp.sendcmd("AVBL /").split(' ')[3] - old_file_size > file_size:
-                        selected_datanodes.add(datanode)
+                        selected_nodes.add(node)
             except ConnectionRefusedError:
                 continue
-        file.nodes = selected_datanodes
-        if len(selected_datanodes) == 0:
-            self.namenode.release_lock(client_ip, abs_path)
+        return selected_nodes
 
-        return {'ips': list(file.nodes), 'path': abs_path}
+    def _delete_file_from_nodes(self, file):
+        for datanode in file.nodes:
+            try:
+                with FTP(datanode, **self.auth_data) as ftp:
+                    ftp.voidcmd(f"DELE {file}")
+            except ConnectionRefusedError:
+                continue
 
     def remove_file(self, file_path):
         parent_dir, abs_path, file_name = self.get_file(file_path)
@@ -150,14 +157,7 @@ class FTPClient:
             return 'File is blocked by another process. Deleting cannot be performed.'
 
         parent_dir.delete_file(file_name)
-
-        for datanode in self.datanodes:
-            try:
-                with FTP(datanode, **self.auth_data) as ftp:
-                    ftp.voidcmd(f"DELE {file}")
-            except ConnectionRefusedError:
-                continue
-
+        self._delete_file_from_nodes(file)
         return 'File was deleted'
 
     def get_info(self, file_path):
@@ -206,8 +206,8 @@ class FTPClient:
             return 'Directory already exist.'
 
         try:
-            dir = parent_dir.add_directory(dir_name)
-            dir.set_write_lock()
+            new_dir = parent_dir.add_directory(dir_name)
+            new_dir.set_write_lock()
 
             for datanode in self.datanodes:
                 try:
@@ -219,7 +219,7 @@ class FTPClient:
             parent_dir.delete_directory(dir_name)
             return 'Directory was not created due to internal error.'
         finally:
-            dir.release_write_lock()
+            new_dir.release_write_lock()
         return ''
 
     def open_directory(self, dir_path):
@@ -289,17 +289,23 @@ class FTPClient:
         file_parent_dir, file_abs_path, file_name = self.get_file(path_from)
         dir_parent_dir, dir_abs_path, dir_name = self.get_dir(path_to)
 
-        if file_parent_dir or dir_parent_dir is None:
-            return file_abs_path, dir_abs_path
+        if dir_parent_dir is None:
+            return dir_abs_path
+
+        if file_parent_dir is None:
+            return file_abs_path
 
         if file_name not in file_parent_dir:
             return 'File does not exist.'
 
-        if dir_name not in dir_parent_dir:
-            return 'Directory does not exist.'
+        if str(dir_parent_dir) != dir_abs_path:
+            if dir_name not in dir_parent_dir:
+                return 'Directory does not exist.'
+            dir = dir_parent_dir.children_directories[dir_name]
+        else:
+            dir = dir_parent_dir
 
         file = file_parent_dir.children_files[file_name]
-        dir = dir_parent_dir.children_directories[dir_name]
         file.set_write_lock()
 
         if file_name in dir_parent_dir.children_files:
@@ -308,11 +314,12 @@ class FTPClient:
         new_file = dir.add_file(file_name)
         new_file.set_write_lock()
 
+        print(file, dir)
         try:
             for datanode in file.nodes:
                 try:
                     with FTP(datanode, **self.auth_data) as ftp:
-                        ftp.voidcmd(f"MV {file_abs_path} {dir_abs_path}")
+                        ftp.voidcmd(f"MV {file} {dir}")
                 except ConnectionRefusedError:
                     continue
             file.release_write_lock()
