@@ -55,7 +55,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == '/copy':
             pass
         elif self.path == '/move':
-            pass
+            msg['msg'] = self.ftp_client.move_file(**args)
         else:
             print("Error! Command doesn't exist.")
             msg['msg'] = 'failure'

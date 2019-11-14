@@ -284,3 +284,43 @@ class FTPClient:
         dirs = [name for name, obj in dir.children_directories.items()]
 
         return {'files': files, 'dirs': dirs}
+
+    def move_file(self, path_from, path_to):
+        file_parent_dir, file_abs_path, file_name = self.get_file(path_from)
+        dir_parent_dir, dir_abs_path, dir_name = self.get_dir(path_to)
+
+        if file_parent_dir or dir_parent_dir is None:
+            return file_abs_path, dir_abs_path
+
+        if file_name not in file_parent_dir:
+            return 'File does not exist.'
+
+        if dir_name not in dir_parent_dir:
+            return 'Directory does not exist.'
+
+        file = file_parent_dir.children_files[file_name]
+        dir = dir_parent_dir.children_directories[dir_name]
+        file.set_write_lock()
+
+        if file_name in dir_parent_dir.children_files:
+            return 'File with the same name already exist in directory.'
+
+        new_file = dir.add_file(file_name)
+        new_file.set_write_lock()
+
+        try:
+            for datanode in file.nodes:
+                try:
+                    with FTP(datanode, **self.auth_data) as ftp:
+                        ftp.voidcmd(f"MV {file_abs_path} {dir_abs_path}")
+                except ConnectionRefusedError:
+                    continue
+            file.release_write_lock()
+            file_parent_dir.delete_file(file_name)
+            new_file.release_write_lock()
+        except Exception as e:
+            new_file.release_write_lock()
+            dir.delete_file(file_name)
+            file.release_write_lock()
+            return 'File was not moved due to internal error.'
+        return ''

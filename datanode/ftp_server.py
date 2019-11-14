@@ -10,7 +10,6 @@ from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
 
-
 proto_cmds = FTPHandler.proto_cmds.copy()
 proto_cmds.update(
     {'SITE RMTREE': dict(perm='d', auth=True, arg=True,
@@ -22,7 +21,9 @@ proto_cmds.update(
      'SITE EXEC': dict(perm='M', auth=True, arg=True,
                        help='Syntax: SITE <SP> EXEC line (execute given command on server).'),
      'CRF': dict(perm='a', auth=True, arg=True,
-                 help='Syntax: CRF path (create empty file).')
+                 help='Syntax: CRF path (create empty file).'),
+     'MV': dict(perm='M', auth=True, arg=True,
+                help='Syntax: MV path_from path_to (move file from path_from to path_to).')
      }
 )
 
@@ -71,6 +72,10 @@ class CustomizedFTPHandler(FTPHandler):
     def ftp_CRF(self, path):
         open(path, 'wb').close()
         self.respond("250 Empty file was created successfully")
+
+    def ftp_MV(self, path_from, path_to):
+        shutil.move(path_from, path_to)
+        self.respond("250 File was moved successfully")
 
 
 def connect_to_namenode(namenode_ip, homedir):
