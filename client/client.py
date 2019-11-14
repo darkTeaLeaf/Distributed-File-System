@@ -48,6 +48,9 @@ def update_lock(event, file_from):
 
 def read_file(file_from, file_to):
     result = send_req('read', {'file_path': file_from})
+    if isinstance(result, 'str'):
+        print(result)
+        return
     datanodes = result['ips']
     file_from = result['path']
 
@@ -78,6 +81,10 @@ def read_file(file_from, file_to):
 
 def write_file(file_from, file_to, **auth_data):
     result = send_req('write', {'file_path': file_to, 'file_size': os.path.getsize(file_from)})
+    if isinstance(result, 'str'):
+        print(result)
+        return
+
     datanodes = result['ips']
     file_from = result['path']
 
@@ -86,23 +93,23 @@ def write_file(file_from, file_to, **auth_data):
     send_clock_update.start()
 
     latencies = ping_datanodes(datanodes)
-    data_stored = False
 
-    for latency, datanode in sorted(zip(latencies, datanodes)):
+    connected_node = None
+    for latency, node in sorted(zip(latencies, datanodes)):
         try:
-            with FTP(datanode, **auth_data) as ftp, open(file_from, 'rb') as localfile:
+            with FTP(node, **auth_data) as ftp, open(file_from, 'rb') as localfile:
                 ftp.login()
                 ftp.storbinary('STOR ' + file_to, localfile)
-                data_stored = True
+                connected_node = node
                 break
         except all_errors:
             continue
 
-    if not data_stored:
+    if connected_node is None:
         print('Cannot connect to datanode')
         send_req('release_lock', {'path_to': file_to})
     else:
-        send_req('replicate_file', {'path_to': file_to})
+        send_req('replicate_file', {'path_to': file_to, 'node_ip': connected_node})
 
     event.set()
     send_clock_update.join()
@@ -158,7 +165,7 @@ def main():
             write_file(args[1], args[2])
         elif args[0] == 'copy':
             send_req('copy', {'path_from': args[1], 'path_to': args[2]})
-        elif args[0] == 'move':
+        elif args[0] == 'mv':
             send_req('move', {'path_from': args[1], 'path_to': args[2]})
         else:
             print("Incorrect command!\nFor help write command: help")

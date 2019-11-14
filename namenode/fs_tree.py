@@ -110,6 +110,7 @@ class File:
         self.nodes = set()
         self.read_counter = 0
         self.write_counter = 0
+        self.size = 0
 
     def __str__(self):
         return os.path.join(str(self.parent), self.name)
