@@ -10,6 +10,7 @@ from namenode.http_handler import Handler
 
 def check_locks(update_time, client_locks, lock_duration):
     while True:
+        dropped_list = []
         for user_ip, locked_files in client_locks.items():
             for file in list(locked_files):
                 lock_start, is_write = locked_files[file]
@@ -20,7 +21,9 @@ def check_locks(update_time, client_locks, lock_duration):
                         file.release_read_lock()
                     locked_files.pop(file)
             if len(locked_files) == 0:
-                client_locks.pop(user_ip)
+                dropped_list.append(user_ip)
+        for user_ip in dropped_list:
+            client_locks.pop(user_ip)
         time.sleep(update_time)
         print('Update')
 

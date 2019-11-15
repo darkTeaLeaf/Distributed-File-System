@@ -1,8 +1,18 @@
 import os
 from datetime import datetime
 from ftplib import FTP
+from threading import Thread
 
 from namenode.fs_tree import Directory
+
+
+def create_replica(status, source_ip, dest_ip, path_from, path_to, auth_data):
+    try:
+        with FTP(source_ip, **auth_data) as ftp:
+            responce = ftp.sendcmd(f"REPL {dest_ip} {path_from} {path_to}").split(' ')[0]
+            status[dest_ip] = responce == '250'
+    except ConnectionRefusedError:
+        status[dest_ip] = False
 
 
 class FTPClient:
@@ -104,8 +114,10 @@ class FTPClient:
         if parent_dir is None:
             return abs_path
 
+        # print(parent_dir, file_name)
         if file_name in parent_dir:
             file = parent_dir.children_files[file_name]
+            print(file.read_counter, file.write_counter, self.namenode.client_locks)
             if not file.writable():
                 return 'File is blocked by another process. Writing cannot be performed.'
         else:
@@ -117,12 +129,45 @@ class FTPClient:
             self.namenode.release_lock(client_ip, abs_path)
             return 'There is no available nodes to store file'
         else:
-            # self._delete_file_from_nodes(file)
             file.new_nodes = selected_nodes
             return {'ips': list(selected_nodes), 'path': abs_path}
 
-    def replicate_file(self, file_name, node_ip):
-        pass
+    def replicate_file(self, file_path, client_ip, node_ip):
+        parent_dir, abs_path, file_name = self.get_file(file_path)
+        if parent_dir is None:
+            return abs_path
+        file = parent_dir.children_files[file_name]
+        self.namenode.release_lock(client_ip, abs_path)
+        file.set_write_lock()
+        if node_ip in file.nodes:
+            file.nodes.remove(node_ip)
+        self._delete_file_from_nodes(file)
+        file.nodes = file.new_nodes
+        left_nodes = file.nodes.copy()
+
+        storing_nodes = {node_ip}
+        while len(left_nodes) > 0 and len(storing_nodes) < self.num_replicas:
+            statuses = {}
+            i = len(storing_nodes)
+            threads = []
+            for storing_node, left_node in zip(storing_nodes, left_nodes):
+                if i >= self.num_replicas:
+                    break
+                args = (statuses, storing_node, left_node, str(file), str(file), self.auth_data)
+                thread = Thread(target=create_replica, args=args)
+                thread.start()
+                threads.append((left_node, storing_node, thread))
+                i += 1
+
+            for thread in threads:
+                thread[-1].join()
+
+            for (dest_node, status), (_, source_node, _) in zip(sorted(statuses.items()), sorted(threads)):
+                left_nodes.remove(dest_node)
+                if status:
+                    storing_nodes.add(dest_node)
+        file.nodes = storing_nodes
+        return "File was replicated"
 
     def _select_datanodes_for_write(self, file, file_size):
         selected_nodes = set()
@@ -130,7 +175,7 @@ class FTPClient:
             try:
                 with FTP(node, **self.auth_data) as ftp:
                     old_file_size = file.size if node in file.nodes else 0
-                    if ftp.sendcmd("AVBL /").split(' ')[3] - old_file_size > file_size:
+                    if int(ftp.sendcmd("AVBL /").split(' ')[3]) - old_file_size > file_size:
                         selected_nodes.add(node)
             except ConnectionRefusedError:
                 continue
@@ -314,7 +359,6 @@ class FTPClient:
         new_file = dir.add_file(file_name)
         new_file.set_write_lock()
 
-        print(file, dir)
         try:
             for datanode in file.nodes:
                 try:

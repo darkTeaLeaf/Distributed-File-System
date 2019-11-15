@@ -1,8 +1,8 @@
 #!/usr/bin/python3.7
-from http.server import BaseHTTPRequestHandler
-from http.server import HTTPServer
-from .ftp_client import FTPClient
 import json
+from http.server import BaseHTTPRequestHandler
+
+from .ftp_client import FTPClient
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -13,13 +13,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
-    def do_GET(self):
-        content_length = int(self.headers['Content-Length'])
-
-        post_data = self.rfile.read(content_length)
-        args = json.loads(post_data)
-
-        self._set_response()
+    def _form_message(self, args):
         msg = {'msg': 'success'}
 
         if self.path == '/synchronize':
@@ -52,7 +46,7 @@ class Handler(BaseHTTPRequestHandler):
             msg['msg'] = self.ftp_client.write_file(client_ip=self.client_address[0], **args)
         elif self.path == '/replicate_file':
             pass
-            # msg['msg'] = self.ftp_client.replicate_file(client_ip=self.client_address[0], **args)
+            msg['msg'] = self.ftp_client.replicate_file(client_ip=self.client_address[0], **args)
         elif self.path == '/copy':
             pass
         elif self.path == '/move':
@@ -61,4 +55,17 @@ class Handler(BaseHTTPRequestHandler):
             print("Error! Command doesn't exist.")
             msg['msg'] = 'failure'
 
-        self.wfile.write(json.dumps(msg).encode('utf-8'))  # send message back to the sender
+        return msg
+
+    def do_GET(self):
+        content_length = int(self.headers['Content-Length'])
+
+        post_data = self.rfile.read(content_length)
+        args = json.loads(post_data)
+
+        try:
+            msg = self._form_message(args)
+            self._set_response()
+            self.wfile.write(json.dumps(msg).encode('utf-8'))  # send message back to the sender
+        except ConnectionResetError:
+            pass

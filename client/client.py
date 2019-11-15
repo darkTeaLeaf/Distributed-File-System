@@ -79,14 +79,16 @@ def read_file(file_from, file_to):
     send_req('release_lock', {'file_path': file_from})
 
 
-def write_file(file_from, file_to):
+def write_file(file_from, file_to=None):
+    if file_to is None:
+        file_to = file_from
     result = send_req('write', {'file_path': file_to, 'file_size': os.path.getsize(file_from)})
-    if isinstance(result, 'str'):
+    if isinstance(result, str):
         print(result)
         return
 
     datanodes = result['ips']
-    file_from = result['path']
+    file_to = result['path']
 
     event = Event()
     send_clock_update = Thread(target=update_lock, args=(event, file_to))
@@ -101,15 +103,17 @@ def write_file(file_from, file_to):
                 ftp.login()
                 ftp.storbinary('STOR ' + file_to, localfile)
                 connected_node = datanode
-                break
+            break
         except all_errors:
             continue
 
     if connected_node is None:
         print('Cannot connect to datanode')
-        send_req('release_lock', {'path_to': file_to})
+        send_req('release_lock', {'file_path': file_to})
     else:
-        send_req('replicate_file', {'path_to': file_to, 'node_ip': connected_node})
+        t = Thread(target=send_req, daemon=True,
+                   args=('replicate_file', {'file_path': file_to, 'node_ip': connected_node}))
+        t.start()
 
     event.set()
     send_clock_update.join()
@@ -154,6 +158,8 @@ def main():
             send_req('mkdir', {'dir_path': args[1]})
         elif args[0] == 'rmdir':
             delete_directory(args[1])
+        elif args[0] == 'write':
+            write_file(args[1])
         else:
             print("Incorrect command!\nFor help write command: help")
     elif len(args) == 3:  # commands with 2 arguments
