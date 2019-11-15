@@ -3,7 +3,7 @@ from datetime import datetime
 from ftplib import FTP
 from threading import Thread
 
-from namenode.fs_tree import Directory
+from namenode.fs_tree import Directory, File
 
 
 def create_replica(status, source_ip, dest_ip, path_from, path_to, auth_data):
@@ -114,10 +114,8 @@ class FTPClient:
         if parent_dir is None:
             return abs_path
 
-        # print(parent_dir, file_name)
         if file_name in parent_dir:
             file = parent_dir.children_files[file_name]
-            print(file.read_counter, file.write_counter, self.namenode.client_locks)
             if not file.writable():
                 return 'File is blocked by another process. Writing cannot be performed.'
         else:
@@ -188,6 +186,35 @@ class FTPClient:
                     ftp.voidcmd(f"DELE {file}")
             except ConnectionRefusedError:
                 continue
+
+    def _copy_file_on_nodes(self, file, new_file):
+        for node in file.nodes:
+            try:
+                with FTP(node, **self.auth_data) as ftp:
+                    ftp.voidcmd(f"MV {file}, {new_file}")
+            except ConnectionRefusedError:
+                continue
+
+    def copy_file(self, file_path_old, file_path_new):
+        parent_dir_old, abs_path_old, file_name_old = self.get_file(file_path_old)
+        parent_dir_new, abs_path_new, file_name_new = self.get_file(file_path_new)
+        if parent_dir_old is None or parent_dir_new is None:
+            return abs_path_old
+
+        if file_name_old not in parent_dir_old:
+            return 'Source file does not exist.'
+        elif parent_dir_new in parent_dir_new:
+            return 'Destination already exist. Delete or move to another location.'
+
+        file_old: File = parent_dir_old.children_files[file_name_old]
+        file_new = parent_dir_new.add_file(file_name_new)
+        file_new.set_write_lock()
+
+        if not file_old.readable():
+            return 'File is being written. Copying cannot be performed.'
+        file_old.set_read_lock()
+        self._copy_file_on_nodes(file_old, file_new)
+        return 'File has been copied successfully.'
 
     def remove_file(self, file_path):
         parent_dir, abs_path, file_name = self.get_file(file_path)

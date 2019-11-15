@@ -45,7 +45,6 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == '/write':
             msg['msg'] = self.ftp_client.write_file(client_ip=self.client_address[0], **args)
         elif self.path == '/replicate_file':
-            pass
             msg['msg'] = self.ftp_client.replicate_file(client_ip=self.client_address[0], **args)
         elif self.path == '/copy':
             pass
