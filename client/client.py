@@ -1,8 +1,9 @@
 #!/usr/bin/python3.7
+import os
 import sys
 from ftplib import FTP, all_errors
 from threading import Thread, Event
-import os
+
 import requests
 from tcp_latency import measure_latency
 

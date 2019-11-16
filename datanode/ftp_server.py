@@ -2,8 +2,8 @@ import argparse
 import os
 import shutil
 import subprocess
-from os.path import join, isdir, isfile, exists
 from ftplib import FTP, all_errors
+from os.path import join, isdir, isfile, exists
 
 import requests
 from pyftpdlib.authorizers import DummyAuthorizer
@@ -25,7 +25,7 @@ proto_cmds.update(
      'MV': dict(perm='M', auth=True, arg=True,
                 help='Syntax: MV path_from path_to (move file from path_from to path_to).'),
      'REPL': dict(perm='w', auth=True, arg=True,
-                    help='Syntax: REPL ip_datanode path_from path_to (make replica on ip_datanode).')
+                  help='Syntax: REPL ip_datanode path_from path_to (make replica on ip_datanode).')
      }
 )
 
