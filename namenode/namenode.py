@@ -1,3 +1,4 @@
+import argparse
 import time
 from collections import defaultdict
 from http.server import HTTPServer
@@ -98,7 +99,17 @@ class Namenode:
 
 
 if __name__ == '__main__':
-    node = Namenode('127.0.0.1', 80, 2, lock_duration=300, update_time=200,
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--ip', type=str, required=True,
+                        help='IP of the Namenode')
+    parser.add_argument('--lock_duration', type=int, required=True,
+                        help='Duration of the lock for read or written files')
+    parser.add_argument('--update_time', type=int, required=True,
+                        help='Period of checking locks in files')
+    args = parser.parse_args()
+
+    node = Namenode(args.ip, 80, 2, lock_duration=args.lock_duration, update_time=args.update_time,
                     username="Namenode", password="1234576890")
 
     node.start()
