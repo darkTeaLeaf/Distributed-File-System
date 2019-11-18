@@ -112,6 +112,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     node = Namenode(args.ip, 80, args.num_replicas, lock_duration=args.lock_duration, update_time=args.update_time,
-                    username="Namenode", password="1234576890")
+                    user="Namenode", passwd="1234576890")
 
     node.start()
