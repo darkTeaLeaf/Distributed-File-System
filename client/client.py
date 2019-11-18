@@ -1,4 +1,3 @@
-#!/usr/bin/python3.7
 import os
 import sys
 from ftplib import FTP, all_errors
@@ -7,7 +6,7 @@ from threading import Thread, Event
 import requests
 from tcp_latency import measure_latency
 
-NAMENODE_ADDR = 'ireknazm.space'
+NAMENODE_ADDR = 'namenode'
 
 
 def print_help():
@@ -28,7 +27,7 @@ def print_help():
 
 def send_req(cmd, args=''):
     try:
-        r = requests.get('http://127.0.0.1:80/' + cmd, json=args)
+        r = requests.get(f'http://{NAMENODE_ADDR}:80/' + cmd, json=args)
         print(r.json()['msg'])
         return r.json()['msg']
     except Exception as e:

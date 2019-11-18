@@ -128,11 +128,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--ip', type=str, required=True,
-                        help='IP of the FTP server')
+                        help='IP of the Datanode FTP server')
     parser.add_argument('--homedir', type=str, required=True,
                         help='Homedir of the FTP server')
     parser.add_argument('--namenode_ip', type=str, required=True,
-                        help='Homedir of the FTP server')
+                        help='IP of the Namenode')
     args = parser.parse_args()
 
     connect_to_namenode(args.namenode_ip, args.homedir)
