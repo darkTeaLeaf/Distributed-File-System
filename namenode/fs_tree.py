@@ -80,7 +80,7 @@ class Directory:
         return new_dir
 
     def delete_directory(self, dir_name):
-        return self.children_files.pop(dir_name)
+        return self.children_directories.pop(dir_name)
 
     def set_read_lock(self):
         if self.parent is not None:

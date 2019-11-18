@@ -111,7 +111,8 @@ def write_file(file_from, file_to=None):
         print('Cannot connect to datanode')
         send_req('release_lock', {'file_path': file_to})
     else:
-        t = Thread(target=send_req, daemon=True,
+        print(file_to, connected_node)
+        t = Thread(target=send_req,
                    args=('replicate_file', {'file_path': file_to, 'node_ip': connected_node}))
         t.start()
 

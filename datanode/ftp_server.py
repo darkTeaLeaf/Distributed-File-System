@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 from ftplib import FTP, all_errors
-from os.path import join, isdir, isfile, exists
+from os.path import join, isdir, isfile, exists, abspath
 
 import requests
 from pyftpdlib.authorizers import DummyAuthorizer
@@ -32,6 +32,7 @@ proto_cmds.update(
 
 class CustomizedFTPHandler(FTPHandler):
     proto_cmds = proto_cmds
+    homedir = ''
 
     def ftp_SITE_RMTREE(self, line):
         if isdir(line):
@@ -75,11 +76,15 @@ class CustomizedFTPHandler(FTPHandler):
         open(path, 'wb').close()
         self.respond("250 Empty file was created successfully")
 
-    def ftp_MV(self, path_from, path_to):
+    def ftp_MV(self, line):
+        path_from, path_to = line.split(' ')
+        path_to = self.homedir + path_to
+        print(path_from, path_to)
         shutil.move(path_from, path_to)
         self.respond("250 File was moved successfully")
 
-    def ftp_REPL(self, ip_datanode, path_from, path_to):
+    def ftp_REPL(self, line):
+        path_from, path_to, ip_datanode = line.split(' ')
         try:
             with FTP(ip_datanode) as ftp, open(path_from, 'rb') as localfile:
                 ftp.login()
@@ -141,6 +146,7 @@ if __name__ == '__main__':
     authorizer.add_anonymous(homedir=args.homedir, perm="elrw")
 
     handler = CustomizedFTPHandler
+    handler.homedir = abspath(args.homedir)
     handler.authorizer = authorizer
 
     server = FTPServer((args.ip, 21), handler)

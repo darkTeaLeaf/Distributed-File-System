@@ -9,7 +9,8 @@ from namenode.fs_tree import Directory, File
 def create_replica(status, source_ip, dest_ip, path_from, path_to, auth_data):
     try:
         with FTP(source_ip, **auth_data) as ftp:
-            responce = ftp.sendcmd(f"REPL {dest_ip} {path_from} {path_to}").split(' ')[0]
+            print(source_ip, dest_ip, path_from, path_to)
+            responce = ftp.sendcmd(f"REPL {path_from} {path_to} {dest_ip}").split(' ')[0]
             status[dest_ip] = responce == '250'
     except ConnectionRefusedError:
         status[dest_ip] = False
@@ -132,6 +133,7 @@ class FTPClient:
 
     def replicate_file(self, file_path, client_ip, node_ip):
         parent_dir, abs_path, file_name = self.get_file(file_path)
+        print(parent_dir, abs_path, file_name)
         if parent_dir is None:
             return abs_path
         file = parent_dir.children_files[file_name]
@@ -140,6 +142,7 @@ class FTPClient:
         if node_ip in file.nodes:
             file.nodes.remove(node_ip)
         self._delete_file_from_nodes(file)
+        print(file.nodes, file.new_nodes)
         file.nodes = file.new_nodes
         left_nodes = file.nodes.copy()
 
@@ -165,6 +168,7 @@ class FTPClient:
                 if status:
                     storing_nodes.add(dest_node)
         file.nodes = storing_nodes
+        file.release_write_lock()
         return "File was replicated"
 
     def _select_datanodes_for_write(self, file, file_size):
@@ -378,27 +382,22 @@ class FTPClient:
             dir = dir_parent_dir
 
         file = file_parent_dir.children_files[file_name]
-        file.set_write_lock()
 
-        if file_name in dir_parent_dir.children_files:
+        if file_name in dir.children_files:
             return 'File with the same name already exist in directory.'
 
-        new_file = dir.add_file(file_name)
-        new_file.set_write_lock()
+        file_parent_dir.delete_file(file_name)
+        print(file_abs_path, os.path.join(dir_abs_path, file_name))
 
         try:
             for datanode in file.nodes:
                 try:
                     with FTP(datanode, **self.auth_data) as ftp:
-                        ftp.voidcmd(f"MV {file} {dir}")
+                        ftp.voidcmd(f"MV {file_abs_path} {os.path.join(dir_abs_path, file_name)}")
                 except ConnectionRefusedError:
                     continue
-            file.release_write_lock()
-            file_parent_dir.delete_file(file_name)
-            new_file.release_write_lock()
         except Exception as e:
-            new_file.release_write_lock()
-            dir.delete_file(file_name)
-            file.release_write_lock()
+            file_parent_dir.children_files[file_name] = file
             return 'File was not moved due to internal error.'
+        dir.children_files[file_name] = file
         return ''
