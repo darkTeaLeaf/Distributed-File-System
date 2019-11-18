@@ -61,7 +61,7 @@ class Directory:
             else:
                 parent_dir, path = path.split('/', 1)
                 if parent_dir in cur_dir:
-                    cur_dir = cur_dir[parent_dir]
+                    cur_dir = cur_dir.children_directories[parent_dir]
                 else:
                     return None, "No such file or directory."
         return cur_dir, os.path.join(str(cur_dir), path.split('/')[-1])
