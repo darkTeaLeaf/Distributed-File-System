@@ -17,8 +17,8 @@ def print_help():
     write  <file name/path on Client> <file name/path in FS>
     rm     <file name/path in FS>
     info   <file name/path in FS>
-    copy   <from file name/path in FS> <to file name/path in FS>
-    move   <from file name/path in FS> <to file name/path in FS>
+    cp     <from file name/path in FS> <to file name/path in FS>
+    mv     <from file name/path in FS> <to file name/path in FS>
     cd     <folder name/path in FS>
     ls     <folder name/path in FS>
     mkdir  <folder name/path in FS>
