@@ -8,11 +8,9 @@ Made by Vyacheslav Shults (B17-DS1), Arina Fedorovskaya (B17-SE1), Irek Nazmiev 
 
 ### Client
 
-1. Clone repository:
-```
-git clone https://github.com/darkTeaLeaf/Distributed-File-System.git
-```
-2. Run shell script for client program setup:
+1. Download file client/create_client.sh.
+
+2. Run shell script for client program setup.
 ```
 sh create_client.sh
 ```
