@@ -330,6 +330,7 @@ class FTPClient:
                 break
             except ConnectionRefusedError:
                 continue
+        file.release_read_lock()
         return result
 
     def create_directory(self, dir_path):
