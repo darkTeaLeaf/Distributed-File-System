@@ -55,8 +55,6 @@ class Namenode:
             self.http_server.serve_forever()
         except KeyboardInterrupt:
             pass
-        finally:
-            t.cancel()
         self.http_server.server_close()
         print("Server is closed")
 

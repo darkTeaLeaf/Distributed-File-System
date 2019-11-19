@@ -164,16 +164,14 @@ def main():
         else:
             print("Incorrect command!\nFor help write command: help")
     elif len(args) == 3:  # commands with 2 arguments
-        if args[0] == 'login':
-            send_req('login', {'username': args[1], 'password': args[2]})
-        elif args[0] == 'read':
+        if args[0] == 'read':
             read_file(args[1], args[2])
         elif args[0] == 'write':
             write_file(args[1], args[2])
-        elif args[0] == 'copy':
-            send_req('copy', {'file_path_old': args[1], 'file_path_new': args[2]})
+        elif args[0] == 'cp':
+            send_req('copy', {'file_path_from': args[1], 'dir_path_to': args[2]})
         elif args[0] == 'mv':
-            send_req('move', {'path_from': args[1], 'path_to': args[2]})
+            send_req('move', {'file_path_from': args[1], 'dir_path_to': args[2]})
         else:
             print("Incorrect command!\nFor help write command: help")
     else:

@@ -28,8 +28,8 @@ class FTPClient:
         for datanode in self.datanodes:
             try:
                 with FTP(datanode, **self.auth_data) as ftp:
-                    ftp.voidcmd("SITE RMDCONT /")
-                    available_size = ftp.sendcmd("AVBL /").split(' ')[3]
+                    ftp.voidcmd("RMDCONT /")
+                    available_size = ftp.sendcmd("AVBL /").split(' ')[4]
                     disk_sizes.append(int(available_size))
             except ConnectionRefusedError:
                 continue
@@ -174,7 +174,7 @@ class FTPClient:
             try:
                 with FTP(node, **self.auth_data) as ftp:
                     old_file_size = file.size if node in file.nodes else 0
-                    if int(ftp.sendcmd("AVBL /").split(' ')[3]) - old_file_size > file_size:
+                    if int(ftp.sendcmd("AVBL /").split(' ')[4]) - old_file_size > file_size:
                         selected_nodes.add(node)
             except ConnectionRefusedError:
                 continue
@@ -182,43 +182,101 @@ class FTPClient:
 
     def _delete_file_from_nodes(self, file):
         deleted_nodes = set()
-        for datanode in file.nodes:
+        for node in file.nodes:
             try:
-                with FTP(datanode, **self.auth_data) as ftp:
+                with FTP(node, **self.auth_data) as ftp:
                     ftp.voidcmd(f"DELE {file}")
-                    deleted_nodes.add(datanode)
+                    deleted_nodes.add(node)
             except ConnectionRefusedError:
                 continue
         return deleted_nodes
 
-    def _copy_file_on_nodes(self, file, new_file):
+    def _copy_file_on_nodes(self, file, new_file, copy=True):
+        new_file_nodes = set()
         for node in file.nodes:
             try:
                 with FTP(node, **self.auth_data) as ftp:
-                    ftp.voidcmd(f"MV {file}, {new_file}")
+                    if copy:
+                        ftp.voidcmd(f"CP {file} {new_file}")
+                    else:
+                        ftp.voidcmd(f"MV {file} {new_file}")
+                    new_file_nodes.add(node)
             except ConnectionRefusedError:
                 continue
+        return new_file_nodes
 
-    def copy_file(self, file_path_old, file_path_new):
-        parent_dir_old, abs_path_old, file_name_old = self.get_file(file_path_old)
-        parent_dir_new, abs_path_new, file_name_new = self.get_file(file_path_new)
-        if parent_dir_old is None or parent_dir_new is None:
-            return abs_path_old
+    def _get_relocation_info(self, file_path_from, dir_path_to):
+        file_parent_dir, file_abs_path, file_name = self.get_file(file_path_from)
+        dir_parent_dir, dir_abs_path, dir_name = self.get_dir(dir_path_to)
 
-        if file_name_old not in parent_dir_old:
-            return 'Source file does not exist.'
-        elif parent_dir_new in parent_dir_new:
-            return 'Destination already exist. Delete or move to another location.'
+        if dir_parent_dir is None:
+            return None, dir_abs_path
 
-        file_old: File = parent_dir_old.children_files[file_name_old]
-        file_new = parent_dir_new.add_file(file_name_new)
+        if file_parent_dir is None:
+            return None, file_abs_path
+
+        if file_name not in file_parent_dir:
+            return None, 'File does not exist.'
+
+        if str(dir_parent_dir) != dir_abs_path:
+            if dir_name not in dir_parent_dir:
+                return None, 'Directory does not exist.'
+            new_parent_dir = dir_parent_dir.children_directories[dir_name]
+        else:
+            new_parent_dir = dir_parent_dir
+
+        if file_name in new_parent_dir.children_files:
+            return None, 'File with the same name already exist in directory.'
+
+        if not file_parent_dir.children_files[file_name].readable():
+            return None, 'File is being written. Copying cannot be performed.'
+
+        return file_name, file_parent_dir, new_parent_dir
+
+    def move_file(self, file_path_from, dir_path_to):
+        result = self._get_relocation_info(file_path_from, dir_path_to)
+        if result[0] is None:
+            return result[1]
+
+        file_name, file_parent_dir, new_parent_dir = result
+        file = file_parent_dir.delete_file(file_name)
+
+        try:
+            new_file_path = os.path.join(str(new_parent_dir), file_name)
+            new_file_nodes = self._copy_file_on_nodes(file, new_file_path, copy=False)
+        except Exception as e:
+            file_parent_dir.children_files[file_name] = file
+            return 'File was not moved due to internal error.'
+        new_parent_dir.children_files[file_name] = file
+        file.parent = new_parent_dir
+        file.nodes = new_file_nodes
+        return ''
+
+    def copy_file(self, file_path_from, dir_path_to):
+        result = self._get_relocation_info(file_path_from, dir_path_to)
+        if result[0] is None:
+            return result[1]
+
+        file_name, file_parent_dir, new_parent_dir = result
+        file_old = file_parent_dir.children_files[file_name]
+
+        file_old.set_read_lock()
+        file_new: File = new_parent_dir.add_file(file_name)
         file_new.set_write_lock()
 
-        if not file_old.readable():
-            return 'File is being written. Copying cannot be performed.'
-        file_old.set_read_lock()
-        self._copy_file_on_nodes(file_old, file_new)
-        return 'File has been copied successfully.'
+        try:
+            new_file_path = os.path.join(str(new_parent_dir), file_name)
+            file_old, new_file_path
+            new_file_nodes = self._copy_file_on_nodes(file_old, new_file_path, copy=True)
+        except Exception as e:
+            file_new.release_write_lock()
+            file_old.release_read_lock()
+            new_parent_dir.delete_file(file_name)
+            return 'File was not moved due to internal error.'
+        file_new.nodes = new_file_nodes
+        file_new.release_write_lock()
+        file_old.release_read_lock()
+        return ''
 
     def remove_file(self, file_path):
         parent_dir, abs_path, file_name = self.get_file(file_path)
@@ -337,7 +395,7 @@ class FTPClient:
         for datanode in self.datanodes:
             try:
                 with FTP(datanode, **self.auth_data) as ftp:
-                    ftp.voidcmd(f"SITE RMTREE {abs_path}")
+                    ftp.voidcmd(f"RMTREE {abs_path}")
             except ConnectionRefusedError:
                 continue
 
@@ -362,42 +420,3 @@ class FTPClient:
         dirs = [name for name, obj in dir.children_directories.items()]
 
         return {'files': files, 'dirs': dirs}
-
-    def move_file(self, path_from, path_to):
-        file_parent_dir, file_abs_path, file_name = self.get_file(path_from)
-        dir_parent_dir, dir_abs_path, dir_name = self.get_dir(path_to)
-
-        if dir_parent_dir is None:
-            return dir_abs_path
-
-        if file_parent_dir is None:
-            return file_abs_path
-
-        if file_name not in file_parent_dir:
-            return 'File does not exist.'
-
-        if str(dir_parent_dir) != dir_abs_path:
-            if dir_name not in dir_parent_dir:
-                return 'Directory does not exist.'
-            dir = dir_parent_dir.children_directories[dir_name]
-        else:
-            dir = dir_parent_dir
-
-        if file_name in dir.children_files:
-            return 'File with the same name already exist in directory.'
-
-        file = file_parent_dir.delete_file(file_name)
-
-        try:
-            for datanode in file.nodes:
-                try:
-                    with FTP(datanode, **self.auth_data) as ftp:
-                        ftp.voidcmd(f"MV {file_abs_path} {os.path.join(dir_abs_path, file_name)}")
-                except ConnectionRefusedError:
-                    continue
-        except Exception as e:
-            file_parent_dir.children_files[file_name] = file
-            return 'File was not moved due to internal error.'
-        dir.children_files[file_name] = file
-        file.parent = dir
-        return ''

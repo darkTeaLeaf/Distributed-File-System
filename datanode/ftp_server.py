@@ -9,12 +9,13 @@ import requests
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
+from pyftpdlib.log import logger
 
 proto_cmds = FTPHandler.proto_cmds.copy()
 proto_cmds.update(
-    {'SITE RMTREE': dict(perm='d', auth=True, arg=True,
+    {'RMTREE': dict(perm='d', auth=True, arg=True,
                          help='Syntax: SITE <SP> RMTREE <SP> path (remove directory tree).'),
-     'SITE RMDCONT': dict(perm='d', auth=True, arg=True,
+     'RMDCONT': dict(perm='d', auth=True, arg=True,
                           help='Syntax: SITE <SP> RMDCONT (remove all nested content in the directory tree).'),
      'AVBL': dict(perm='l', auth=True, arg=True,
                   help='Syntax: AVBL (return size of total used and free disk space).'),
@@ -24,6 +25,8 @@ proto_cmds.update(
                  help='Syntax: CRF path (create empty file).'),
      'MV': dict(perm='M', auth=True, arg=True,
                 help='Syntax: MV path_from path_to (move file from path_from to path_to).'),
+     'CP': dict(perm='w', auth=True, arg=True,
+                help='Syntax: CP path_from path_to (copy file from path_from to path_to).'),
      'REPL': dict(perm='w', auth=True, arg=True,
                   help='Syntax: REPL ip_datanode path_from path_to (make replica on ip_datanode).')
      }
@@ -34,14 +37,14 @@ class CustomizedFTPHandler(FTPHandler):
     proto_cmds = proto_cmds
     homedir = ''
 
-    def ftp_SITE_RMTREE(self, line):
+    def ftp_RMTREE(self, line):
         if isdir(line):
             shutil.rmtree(line)
-            self.respond("250 Directory tree was deleted successfully")
+            self.respond("250 RMTREE Directory tree was deleted successfully", logfun=logger.info)
         else:
-            self.respond("550 Given path is not a directory")
+            self.respond(f"550 RMTREE {line} is not a directory", logfun=logger.info)
 
-    def ftp_SITE_RMDCONT(self, line):
+    def ftp_RMDCONT(self, line):
         if isdir(line):
             for obj in os.listdir(line):
                 obj = join(line, obj)
@@ -49,38 +52,44 @@ class CustomizedFTPHandler(FTPHandler):
                     shutil.rmtree(obj)
                 elif isfile(obj):
                     os.remove(obj)
-            self.respond("250 Content of the directory was deleted successfully")
+            self.respond(f"250 RMDCONT Content of {line} was deleted successfully", logfun=logger.info)
         else:
-            self.respond("550 Given path is not a directory")
+            self.respond(f"550 RMDCONT {line} is not a directory", logfun=logger.info)
 
     def ftp_AVBL(self, line):
         if isdir(line):
             total, used, free = shutil.disk_usage("/")
-            self.respond(f"213 {total} {used} {free}")
+            self.respond(f"213 AVBL {total} {used} {free}", logfun=logger.info)
             return total, used, free
         else:
-            self.respond("550 Given path is not a directory")
+            self.respond(f"550 AVBL {line} is not a directory", logfun=logger.info)
 
     def ftp_SITE_EXEC(self, line):
         process = subprocess.run(line, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
         if process.returncode != 0:
             error = process.stderr.decode("utf-8")
-            self.respond(f"500 {error}")
+            self.respond(f"500 SITE EXEC {line} failed with {error}", logfun=logger.info)
             return error
         else:
-            self.respond("250 Given command was executed successfully")
+            self.respond(f"250 SITE EXEC {line} was executed successfully", logfun=logger.info)
             return process.stdout.decode("utf-8")
 
     def ftp_CRF(self, path):
         open(path, 'wb').close()
-        self.respond("250 Empty file was created successfully")
+        self.respond(f"250 CRF {path} was created successfully", logfun=logger.info)
 
     def ftp_MV(self, line):
         path_from, path_to = line.split(' ')
         path_to = self.homedir + path_to
-        shutil.move(path_from, path_to)
-        self.respond("250 File was moved successfully")
+        dest = shutil.move(path_from, path_to)
+        self.respond(f"250 MV {path_from} was copied to {dest} successfully", logfun=logger.info)
+
+    def ftp_CP(self, line):
+        path_from, path_to = line.split(' ')
+        path_to = self.homedir + path_to
+        dest = shutil.copyfile(path_from, path_to)
+        self.respond(f"250 CP {path_from} was copied to {dest} successfully", logfun=logger.info)
 
     def ftp_REPL(self, line):
         path_from, path_to, ip_datanode = line.split(' ')
@@ -89,10 +98,10 @@ class CustomizedFTPHandler(FTPHandler):
                 ftp.login()
                 ftp.storbinary('STOR ' + path_to, localfile)
         except all_errors:
-            self.respond(f"500 Replica was not created on {ip_datanode} due to connection error")
+            self.respond(f"500 REPL Replica was not created on {ip_datanode} due to connection error", logfun=logger.info)
             return False
 
-        self.respond(f"250 Replica was created on {ip_datanode}")
+        self.respond(f"250 REPL Replica was created on {ip_datanode}", logfun=logger.info)
         return True
 
 
