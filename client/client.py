@@ -72,6 +72,8 @@ def read_file(file_from, file_to=None):
                 break
         except PermissionError:
             print("Cannot open file. Try with sudo")
+            data_stored = True
+            break
         except all_errors:
             continue
 

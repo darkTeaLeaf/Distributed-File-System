@@ -2,7 +2,6 @@
 sudo mkdir meowfs
 cd meowfs
 sudo wget https://raw.githubusercontent.com/darkTeaLeaf/Distributed-File-System/master/client/client.py
-#sudo cp ~/dfs/client/client.py client.py
 sudo wget https://raw.githubusercontent.com/darkTeaLeaf/Distributed-File-System/master/client/meowfs.spec
 
 sudo pip3 install pyinstaller
