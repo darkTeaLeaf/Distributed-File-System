@@ -144,6 +144,7 @@ class FTPClient:
         left_nodes = file.nodes.copy()
 
         storing_nodes = {node_ip}
+        left_nodes = left_nodes.difference(storing_nodes)
         while len(left_nodes) > 0 and len(storing_nodes) < self.num_replicas:
             statuses = {}
             i = len(storing_nodes)

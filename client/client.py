@@ -25,10 +25,11 @@ def print_help():
     rmdir  <folder name/path in FS>\n""")
 
 
-def send_req(cmd, args=''):
+def send_req(cmd, args='', show=True):
     try:
         r = requests.get(f'http://{NAMENODE_ADDR}:80/' + cmd, json=args)
-        print(r.json()['msg'])
+        if show:
+            print(r.json()['msg'])
         return r.json()['msg']
     except Exception as e:
         print(e)
@@ -43,12 +44,14 @@ def ping_datanodes(datanodes):
 
 def update_lock(event, file_from):
     while not event.wait(300):
-        send_req('update_lock', {'file_path': file_from})
+        send_req('update_lock', {'file_path': file_from}, show=False)
 
 
-def read_file(file_from, file_to):
-    result = send_req('read', {'file_path': file_from})
-    if isinstance(result, 'str'):
+def read_file(file_from, file_to=None):
+    if file_to is None:
+        file_to = file_from
+    result = send_req('read', {'file_path': file_from}, show=False)
+    if isinstance(result, str):
         print(result)
         return
     datanodes = result['ips']
@@ -76,13 +79,15 @@ def read_file(file_from, file_to):
     event.set()
     send_clock_update.join()
 
-    send_req('release_lock', {'file_path': file_from})
+    send_req('release_lock', {'file_path': file_from}, show=False)
 
 
 def write_file(file_from, file_to=None):
     if file_to is None:
         file_to = file_from
-    result = send_req('write', {'file_path': file_to, 'file_size': os.path.getsize(file_from)})
+    result = send_req('write',
+                      {'file_path': file_to, 'file_size': os.path.getsize(file_from)},
+                      show=False)
     if isinstance(result, str):
         print(result)
         return
@@ -109,10 +114,12 @@ def write_file(file_from, file_to=None):
 
     if connected_node is None:
         print('Cannot connect to datanode')
-        send_req('release_lock', {'file_path': file_to})
+        send_req('release_lock', {'file_path': file_to}, show=False)
     else:
         t = Thread(target=send_req,
-                   args=('replicate_file', {'file_path': file_to, 'node_ip': connected_node}))
+                   args=('replicate_file',
+                         {'file_path': file_to, 'node_ip': connected_node},
+                         False))
         t.start()
 
     event.set()
@@ -120,7 +127,7 @@ def write_file(file_from, file_to=None):
 
 
 def delete_directory(dir_path):
-    response, flag = send_req('rmdir', {'dir_path': dir_path})
+    response, flag = send_req('rmdir', {'dir_path': dir_path}, show=False)
 
     if flag:
         answer = input(response)
@@ -132,7 +139,6 @@ def delete_directory(dir_path):
 
 def main():
     args = sys.argv[1:]  # get command with arguments
-    print(args[0])
     if len(args) == 0:
         print("Empty command!\nFor help write command: help")
     elif len(args) == 1:  # commands without any argument
@@ -159,6 +165,8 @@ def main():
             send_req('mkdir', {'dir_path': args[1]})
         elif args[0] == 'rmdir':
             delete_directory(args[1])
+        elif args[0] == 'read':
+            read_file(args[1])
         elif args[0] == 'write':
             write_file(args[1])
         else:
