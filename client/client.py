@@ -111,7 +111,6 @@ def write_file(file_from, file_to=None):
         print('Cannot connect to datanode')
         send_req('release_lock', {'file_path': file_to})
     else:
-        print(file_to, connected_node)
         t = Thread(target=send_req,
                    args=('replicate_file', {'file_path': file_to, 'node_ip': connected_node}))
         t.start()
@@ -133,6 +132,7 @@ def delete_directory(dir_path):
 
 def main():
     args = sys.argv[1:]  # get command with arguments
+    print(args[0])
     if len(args) == 0:
         print("Empty command!\nFor help write command: help")
     elif len(args) == 1:  # commands without any argument

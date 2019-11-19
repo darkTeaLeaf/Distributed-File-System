@@ -8,15 +8,15 @@ from os.path import join, isdir, isfile, exists, abspath
 import requests
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
-from pyftpdlib.servers import FTPServer
 from pyftpdlib.log import logger
+from pyftpdlib.servers import FTPServer
 
 proto_cmds = FTPHandler.proto_cmds.copy()
 proto_cmds.update(
     {'RMTREE': dict(perm='d', auth=True, arg=True,
-                         help='Syntax: SITE <SP> RMTREE <SP> path (remove directory tree).'),
+                    help='Syntax: SITE <SP> RMTREE <SP> path (remove directory tree).'),
      'RMDCONT': dict(perm='d', auth=True, arg=True,
-                          help='Syntax: SITE <SP> RMDCONT (remove all nested content in the directory tree).'),
+                     help='Syntax: SITE <SP> RMDCONT (remove all nested content in the directory tree).'),
      'AVBL': dict(perm='l', auth=True, arg=True,
                   help='Syntax: AVBL (return size of total used and free disk space).'),
      'SITE EXEC': dict(perm='M', auth=True, arg=True,
@@ -36,6 +36,7 @@ proto_cmds.update(
 class CustomizedFTPHandler(FTPHandler):
     proto_cmds = proto_cmds
     homedir = ''
+    auth_data = {}
 
     def ftp_RMTREE(self, line):
         if isdir(line):
@@ -94,11 +95,13 @@ class CustomizedFTPHandler(FTPHandler):
     def ftp_REPL(self, line):
         path_from, path_to, ip_datanode = line.split(' ')
         try:
-            with FTP(ip_datanode) as ftp, open(path_from, 'rb') as localfile:
-                ftp.login()
+            with FTP(ip_datanode, **self.auth_data) as ftp, open(path_from, 'rb') as localfile:
+                if not self.auth_data:
+                    ftp.login()
                 ftp.storbinary('STOR ' + path_to, localfile)
         except all_errors:
-            self.respond(f"500 REPL Replica was not created on {ip_datanode} due to connection error", logfun=logger.info)
+            self.respond(f"500 REPL Replica was not created on {ip_datanode} due to connection error",
+                         logfun=logger.info)
             return False
 
         self.respond(f"250 REPL Replica was created on {ip_datanode}", logfun=logger.info)
@@ -150,11 +153,13 @@ if __name__ == '__main__':
 
     connect_to_namenode(args.namenode_ip, args.homedir)
     authorizer = DummyAuthorizer()
-    authorizer.add_user("Namenode", "1234576890", homedir=args.homedir, perm="elradfmwMT")
+    auth_data = {'user': "Namenode", 'passwd': "1234576890"}
+    authorizer.add_user(auth_data['user'], auth_data['passwd'], homedir=args.homedir, perm="elradfmwMT")
     authorizer.add_anonymous(homedir=args.homedir, perm="elrw")
 
     handler = CustomizedFTPHandler
     handler.homedir = abspath(args.homedir)
+    handler.auth_data = auth_data
     handler.authorizer = authorizer
 
     server = FTPServer((args.ip, 21), handler)

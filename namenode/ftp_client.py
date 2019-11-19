@@ -266,7 +266,6 @@ class FTPClient:
 
         try:
             new_file_path = os.path.join(str(new_parent_dir), file_name)
-            file_old, new_file_path
             new_file_nodes = self._copy_file_on_nodes(file_old, new_file_path, copy=True)
         except Exception as e:
             file_new.release_write_lock()
