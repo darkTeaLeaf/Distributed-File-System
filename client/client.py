@@ -70,6 +70,8 @@ def read_file(file_from, file_to=None):
                 ftp.retrbinary('RETR ' + file_from, localfile.write, 1024)
                 data_stored = True
                 break
+        except PermissionError:
+            print("Cannot open file. Try with sudo")
         except all_errors:
             continue
 
