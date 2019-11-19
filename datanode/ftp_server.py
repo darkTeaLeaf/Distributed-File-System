@@ -79,7 +79,6 @@ class CustomizedFTPHandler(FTPHandler):
     def ftp_MV(self, line):
         path_from, path_to = line.split(' ')
         path_to = self.homedir + path_to
-        print(path_from, path_to)
         shutil.move(path_from, path_to)
         self.respond("250 File was moved successfully")
 

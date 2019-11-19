@@ -125,7 +125,7 @@ def delete_directory(dir_path):
 
     if flag:
         answer = input(response)
-        if answer == 'Y':
+        if answer.lower() in ['y', 'yes']:
             send_req('rmdir', {'dir_path': dir_path, 'force_delete': True})
     else:
         print(response)
